@@ -15,4 +15,8 @@ class Almacen extends Model
     ];
 
     public $timestamps = true;
+    public function warehouseDocuments()
+    {
+        return $this->hasMany(WarehouseDocument::class, 'almacen_id');
+    }
 }

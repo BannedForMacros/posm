@@ -12,13 +12,23 @@ import {
   Boxes,
   FolderTree,
   Monitor,
-  Users,        // Icono para Proveedores (o el que gustes)
-  FileText      // Icono para Facturación/Compras (opcional)
+  Users,
+  FileText,
+  Home,
+  Package, // Para Inventario
+  Building2, // Para Sucursales
+  Building,  // Para Almacenes
+  Factory,   // Para Operaciones
+  ClipboardList, // Para Lista de Precios
 } from "lucide-react";
 
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showMantenimiento, setShowMantenimiento] = useState(false);
+
+  // Si necesitas más submenús (ej. para Almacenes, Operaciones, etc.), puedes agregar
+  // más flags de estado si quieres controlar su apertura individual.
+  const [showInventario, setShowInventario] = useState(false);
 
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
@@ -38,7 +48,7 @@ const Sidebar = () => {
       items: [
         {
           icon: <Boxes size={20} />,
-          label: 'Artículos',
+          label: 'Artículos (CRUD)',
           href: '/articulos-manage'
         },
         {
@@ -51,6 +61,21 @@ const Sidebar = () => {
           label: 'Proveedores',
           href: '/proveedores'
         },
+        {
+          icon: <Building2 size={20} />,
+          label: 'Sucursales',
+          href: '/sucursales'
+        },
+        {
+          icon: <Building size={20} />,
+          label: 'Almacenes',
+          href: '/almacenes'
+        },
+        {
+          icon: <Factory size={20} />,
+          label: 'Operaciones',
+          href: '/api/operaciones' // O si creas vista Inertia: '/operaciones'
+        },
       ]
     },
     {
@@ -59,7 +84,6 @@ const Sidebar = () => {
       href: '/articulos'
     },
     {
-      // Usamos FileText o ShoppingCart, según prefieras
       icon: <FileText size={20} />,
       label: 'Compras',
       href: '/facturacion'
@@ -68,6 +92,40 @@ const Sidebar = () => {
       icon: <ShoppingCart size={20} />,
       label: 'Ventas',
       href: '/ventas'
+    },
+    {
+      icon: <ClipboardList size={20} />,
+      label: 'Lista de Precios',
+      href: '/lista-precios'
+    },
+    {
+      icon: <Package size={20} />,
+      label: 'Inventario',
+      type: 'submenu',
+      isOpen: showInventario,
+      toggle: () => setShowInventario(!showInventario),
+      items: [
+        {
+          icon: <Package size={20} />,
+          label: 'Inventario Inicial',
+          href: '/inventario-inicial'
+        },
+        {
+          icon: <Package size={20} />,
+          label: 'Stock Inventario',
+          href: '/inventario' // Ajusta si tu vista principal de inventario es /inventario
+        },
+        {
+          icon: <Package size={20} />,
+          label: 'Docs. de Almacén',
+          href: '/warehouse-documents'
+        },
+        {
+          icon: <Package size={20} />,
+          label: 'Movimientos Almacén',
+          href: '/warehouse-movements'
+        },
+      ]
     },
     {
       icon: <Settings size={20} />,
@@ -144,8 +202,11 @@ const Sidebar = () => {
 
   return (
     <div className="relative">
-      <div className={`fixed top-0 left-0 h-full bg-gray-900 text-gray-100 
-        transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}
+      <div className={`
+        fixed top-0 left-0 h-full bg-gray-900 text-gray-100 
+        transition-all duration-300 ease-in-out
+        ${isCollapsed ? 'w-20' : 'w-64'}
+      `}
       >
         <div className="relative py-5">
           <div className="flex justify-center items-center">

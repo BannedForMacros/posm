@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class FacturacionController extends Controller
 {
@@ -37,23 +38,30 @@ public function index()
     // POST /api/facturacion
     public function store(Request $request)
     {
+        // Validaciones
         $request->validate([
-            'tipo_documento' => 'required|integer',
-            'num_serie'      => 'required|integer',
-            'num_documento'  => 'required|integer',
-            'cod_proveedor'  => 'required|integer',
-            'fecha'          => 'required|date',
-            'valor_compra'   => 'required|numeric',
-            'detalles'       => 'required|array',
-            'detalles.*.cod_articulo'    => 'required|integer',
-            'detalles.*.cantidad'        => 'required|numeric',
-            'detalles.*.precio_unitario' => 'required|numeric',
+            'tipo_documento'            => 'required|integer',
+            'num_serie'                 => 'required|integer',
+            'num_documento'             => 'required|integer',
+            'cod_proveedor'             => 'required|integer',
+            'fecha'                     => 'required|date',
+            'valor_compra'              => 'required|numeric',
+            'detalles'                  => 'required|array',
+            'detalles.*.cod_articulo'   => 'required|integer',
+            'detalles.*.cantidad'       => 'required|numeric',
+            'detalles.*.precio_unitario'=> 'required|numeric',
+
+            // Campo opcional para indicar si se generará doc. de almacén
+            'generar_almacen'  => 'boolean',
+            // Si deseas recibir almacen_id y operacion_id
+            // 'almacen_id'    => 'integer',
+            // 'operacion_id'  => 'integer',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Crear la cabecera
+            // 1) Crear la cabecera Facturación vía SP
             $result = DB::select("CALL sp_crearFacturacion(?, ?, ?, ?, ?, ?)", [
                 $request->tipo_documento,
                 $request->num_serie,
@@ -64,7 +72,7 @@ public function index()
             ]);
             $facturacion_id = $result[0]->id;
 
-            // Crear los detalles
+            // 2) Crear los detalles vía SP
             foreach ($request->detalles as $detalle) {
                 DB::statement("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
                     $facturacion_id,
@@ -72,6 +80,78 @@ public function index()
                     $detalle['cantidad'],
                     $detalle['precio_unitario']
                 ]);
+            }
+
+            // 3) Si se va a generar documento de almacén
+            if ($request->filled('generar_almacen') && $request->generar_almacen == true) {
+                // a) Fijar la operación a ID=1 (por ejemplo, "Compra")
+                $operacionId = 1; 
+
+                // b) Tomar el user logueado
+                $user = auth()->user();
+                // El ruc del usuario
+                $rucUsuario = $user->ruc ?? '20507661441';
+                // El ID del usuario (si en tu warehouse_document lo guardas)
+                $userId = $user->id ?? null;
+
+                // c) Tomar el almacen (si no llega, usar 1 por defecto)
+                $almacenId = $request->almacen_id ?? 1;
+
+                // d) Crear la cabecera en warehouse_document
+                $wdId = DB::table('warehouse_document')->insertGetId([
+                    'ruc'             => $rucUsuario,
+                    'almacen_id'      => $almacenId,
+                    'facturacion_id'  => $facturacion_id,
+                    'user_id'         => $userId,
+                    'operacion_id'    => $operacionId,
+                    'tipo_movimiento' => 'INGRESO',   // para compras
+                    'fecha'           => Carbon::now(),
+                    'estado'          => 1,
+                    'created_at'      => Carbon::now(),
+                    'updated_at'      => Carbon::now()
+                ]);
+
+                // e) Insertar detalles en warehouse_document_detail y actualizar stock
+                foreach ($request->detalles as $det) {
+                    // Insert en warehouse_document_detail
+                    DB::table('warehouse_document_detail')->insert([
+                        'warehouse_document_id' => $wdId,
+                        'cod_articulo'          => $det['cod_articulo'],
+                        'cantidad'              => $det['cantidad'],
+                        'precio_unitario'       => $det['precio_unitario'],
+                        'costo'                 => 0,  // si usas costo
+                        'estado'                => 1,
+                        'created_at'            => Carbon::now(),
+                        'updated_at'            => Carbon::now()
+                    ]);
+
+                    // Actualizar/crear en inventario
+                    $invent = DB::table('inventario')
+                                ->where('ruc', $rucUsuario)
+                                ->where('almacen_id', $almacenId)
+                                ->where('cod_articulo', $det['cod_articulo'])
+                                ->first();
+
+                    if ($invent) {
+                        // sumar stock
+                        DB::table('inventario')
+                            ->where('id', $invent->id)
+                            ->update([
+                                'stock' => $invent->stock + $det['cantidad'],
+                                'updated_at' => Carbon::now()
+                            ]);
+                    } else {
+                        // no existía => insertar
+                        DB::table('inventario')->insert([
+                            'ruc'          => $rucUsuario,
+                            'almacen_id'   => $almacenId,
+                            'cod_articulo' => $det['cod_articulo'],
+                            'stock'        => $det['cantidad'],
+                            'created_at'   => Carbon::now(),
+                            'updated_at'   => Carbon::now()
+                        ]);
+                    }
+                }
             }
 
             DB::commit();
@@ -88,6 +168,9 @@ public function index()
             ], 500);
         }
     }
+
+    // GET /api/facturacion/{id}
+
 
     // GET /api/facturacion/{id}
     public function show($id)

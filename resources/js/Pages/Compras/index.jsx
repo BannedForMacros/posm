@@ -13,6 +13,7 @@ import ViewModal from './components/ViewModal';
 const ComprasIndex = () => {
   // Extraemos datos y funciones del hook
   const { facturaciones, loading, eliminarCompra, loadFacturaciones } = useCompras();
+  
 
   // Control de modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);

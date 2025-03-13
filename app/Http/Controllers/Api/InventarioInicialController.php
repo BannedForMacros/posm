@@ -20,14 +20,12 @@ class InventarioInicialController extends Controller
         }
 
         try {
-            $sucursalId = $request->query('sucursal_id', 0);
             $almacenId  = $request->query('almacen_id', 0);
             $busqueda   = $request->query('busqueda', '');
 
             // Llamamos a tu SP (ajusta el nombre si cambió):
-            $lista = DB::select("CALL sp_listarArticulosInventario(?, ?, ?, ?)", [
+            $lista = DB::select("CALL sp_listarArticulosInventario(?, ?, ?)", [
                 $user->ruc,
-                $sucursalId,
                 $almacenId,
                 $busqueda
             ]);
@@ -55,7 +53,6 @@ class InventarioInicialController extends Controller
 
         // Validaciones
         $request->validate([
-            'sucursal_id'   => 'required|integer',
             'almacen_id'    => 'required|integer',
             'cod_articulo'  => 'required|integer',
             'stock_inicial' => 'required|numeric'
@@ -63,9 +60,8 @@ class InventarioInicialController extends Controller
 
         try {
             // Llamada a tu SP para registrar/actualizar stock inicial
-            $result = DB::select('CALL sp_registrarStockInicial(?, ?, ?, ?, ?)', [
+            $result = DB::select('CALL sp_registrarStockInicial(?, ?, ?, ?)', [
                 $user->ruc,
-                $request->sucursal_id,
                 $request->almacen_id,
                 $request->cod_articulo,
                 $request->stock_inicial
@@ -113,4 +109,35 @@ class InventarioInicialController extends Controller
             'message' => 'Estado actualizado correctamente'
         ], 200);
     }
+
+    public function showStockInicial(Request $request)
+    {
+        $almacenId   = $request->query('almacen_id');
+        $codArticulo = $request->query('cod_articulo');
+    
+        // Verificamos si vienen ambos parámetros
+        if (!$almacenId || !$codArticulo) {
+            return response()->json(['error' => 'Faltan parámetros'], 400);
+        }
+    
+        try {
+            $fila = DB::table('inventario_inicial')
+                ->where('almacen_id', $almacenId)
+                ->where('cod_articulo', $codArticulo)
+                ->where('ruc', auth()->user()->ruc)
+                ->first();
+    
+            if (!$fila) {
+                return response()->json(['stock_inicial' => 0]);
+            }
+    
+            return response()->json(['stock_inicial' => $fila->stock_inicial]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al obtener stock inicial',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
+    

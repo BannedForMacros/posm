@@ -12,8 +12,14 @@ use App\Http\Controllers\Api\FacturacionController;
 use App\Http\Controllers\Api\ProveedoresController;
 use App\Http\Controllers\Api\SucursalesController;
 use App\Http\Controllers\Api\AlmacenesController;
-use App\Http\Controllers\Api\InventarioController;
+use App\Http\Controllers\Api\InventarioInicialController;
 use App\Http\Controllers\Api\ListaPreciosController;
+use App\Http\Controllers\Api\OperacionController;
+use App\Http\Controllers\Api\WarehouseDocumentController;
+use App\Http\Controllers\Api\WarehouseDocumentDetailController;
+use App\Http\Controllers\Api\InventarioController;
+
+
 
 
 
@@ -32,6 +38,41 @@ Route::middleware(['auth'])->group(function () {
             'user' => auth()->user(),
         ]);
     })->name('dashboard');
+
+    
+// *********************************************************************
+    // SECCIÓN CORREGIDA: Warehouse Documents dentro del grupo de autenticación
+    // *********************************************************************
+    Route::get('/warehouse-documents', function (Request $request) {
+        return Inertia::render('Warehouse/Index', [ // <-- si tu archivo es "Index.jsx"
+            'articulos' => [],
+            'filters'   => [
+                'almacen_id' => null,
+                'search'     => ''
+            ],
+        ]);
+    })->name('warehouse_documents.index');
+
+    Route::get('/warehouse-movements', function () {
+        return Inertia::render('Warehouse/MovementsIndex'); // <-- si tu archivo es "MovementsIndex.jsx"
+    })->name('warehouse.movements.index');
+
+    Route::prefix('api')->group(function() {
+        // Rutas warehouse-documents
+        Route::prefix('warehouse-documents')->group(function() {
+            Route::get('/', [WarehouseDocumentController::class, 'index']);
+            Route::get('/{id}', [WarehouseDocumentController::class, 'show']);
+        });
+        // Rutas warehouse-document-details
+        Route::prefix('warehouse-document-details')->group(function() {
+            Route::get('/', [WarehouseDocumentDetailController::class, 'index']);
+            Route::get('/{id}', [WarehouseDocumentDetailController::class, 'show']);
+            Route::get('/movimientos-por-producto', [WarehouseDocumentDetailController::class, 'movimientosPorProducto']);
+        });
+        // RUTA /api/warehouse-movements
+        Route::get('/warehouse-movements', [WarehouseDocumentDetailController::class, 'movementsIndex']);
+    });
+    
 
     /**
      * FAMILIAS (CRUD) - usando 'id' como PK
@@ -94,24 +135,42 @@ Route::prefix('api/almacenes')->group(function() {
          ->name('api.almacenes.destroy');
 });
 
-        // Vista Inertia para Inventario
-        Route::get('/inventario', function () {
-            return Inertia::render('Inventario/Index');
-        })->name('inventario.index');
-    
-        // API Inventario
-        Route::prefix('api/inventario')->group(function () {
-            Route::get('/', [InventarioController::class, 'index'])
-                ->name('api.inventario.index');
+        // Vista Inertia para Inventario Inicial
+        Route::get('/inventario-inicial', function () {
+            return Inertia::render('InventarioInicial/Index');
+        })->name('inventario_inicial.index');
+
+        // API Inventario Inicial
+        Route::prefix('api/inventario-inicial')->group(function () {
+            // GET /api/inventario-inicial
+            Route::get('/', [InventarioInicialController::class, 'index'])
+                ->name('api.inventario_inicial.index');
+            
+            // POST /api/inventario-inicial/registrar-stock
+            Route::post('/registrar-stock', [InventarioInicialController::class, 'registrarStockInicial'])
+                ->name('api.inventario_inicial.registrar_stock');
         
-            // Quitar 'inventario/' en la parte de la ruta
-            Route::post('/registrar-stock', [InventarioController::class, 'registrarStockInicial'])
-                ->name('api.inventario.registrar_stock');
-                    // IMPORTANTE: define la ruta POST /api/inventario/update-estado
-            Route::post('/update-estado', [InventarioController::class, 'updateEstado'])
-                ->name('api.inventario.update_estado');
+            // POST /api/inventario-inicial/update-estado
+            Route::post('/update-estado', [InventarioInicialController::class, 'updateEstado'])
+                ->name('api.inventario_inicial.update_estado');
+            
+            Route::get('/stock', [InventarioInicialController::class, 'showStockInicial'])
+                ->name('api.inventario_inicial.show_stock');
         });
-        
+
+
+            // Rutas de inventario
+            // Rutas API
+            Route::prefix('api')->group(function() {
+                Route::get('/inventario', [InventarioController::class, 'apiIndex'])
+                    ->name('api.inventario.index');
+            });
+
+            // Ruta Inertia (si quieres una vista en /inventario)
+            Route::get('/inventario', function () {
+                return Inertia::render('Inventario/Index');
+            })->name('inventario.index');
+
         //LISTA PRECIOS: 
         Route::prefix('api/listaprecios')->group(function() {
             // GET /api/listaprecios
@@ -189,42 +248,70 @@ Route::prefix('api/almacenes')->group(function() {
     })->name('facturacion.manage');
     
 
-    /**
-     * VENTAS
-     */
-    Route::get('/ventas', function () {
-        return Inertia::render('Ventas');
-    })->name('ventas');
-
-    Route::prefix('api/ventas')->group(function () {
-        Route::get('/', [VentasController::class, 'index'])
-            ->name('api.ventas.index');
-
-        Route::get('/detalles/{cod_documento}/{seri_venta}/{nume_venta}',
-            [VentasController::class, 'showDetails']
-        )->name('api.ventas.detalles');
-
-        Route::get('/formas-pago/{cod_documento}/{seri_venta}/{nume_venta}',
-            [VentasController::class, 'showPaymentMethods']
-        )->name('api.ventas.formas_pago');
-
-        // Gráficas
-        Route::get('/grafica-ventas-por-dia', [VentasController::class, 'graficaVentasPorDia'])
-            ->name('api.ventas.grafica_por_dia');
-        Route::get('/grafica-ventas-por-formapago', [VentasController::class, 'graficaVentasPorFormaPago'])
-            ->name('api.ventas.grafica_por_formapago');
-        Route::get('/grafica-ventas-por-articulo', [VentasController::class, 'graficaVentasPorArticulo'])
-            ->name('api.ventas.grafica_por_articulo');
-        Route::get('/grafica-top-articulos', [VentasController::class, 'graficaTopArticulos'])
-            ->name('api.ventas.grafica_top_articulos');
-
-        Route::get('/estadisticas-generales', [VentasController::class, 'estadisticasGenerales'])
-            ->name('api.ventas.estadisticas_generales');
-            
-        Route::get('/detalle-completo/{cod_documento}/{seri_venta}/{nume_venta}', 
-            [VentasController::class, 'getDetalleCompleto']
-        )->name('api.ventas.detalle_completo');
+    //OPERACION SUNAT
+    Route::prefix('api')->group(function() {
+        Route::prefix('operaciones')->group(function() {
+            Route::get('/', [OperacionController::class, 'index']);
+            Route::post('/', [OperacionController::class, 'store']);
+            Route::get('/{id}', [OperacionController::class, 'show']);
+            Route::put('/{id}', [OperacionController::class, 'update']);
+            Route::delete('/{id}', [OperacionController::class, 'destroy']);
+        });
     });
+/**
+ * VENTAS
+ */
+// Vista principal de Ventas con Inertia
+Route::get('/ventas', function () {
+    return Inertia::render('Ventas/index'); // <- Componente React principal de Ventas
+})->name('ventas.index');
+
+// Rutas de la API para Ventas
+Route::prefix('api/ventas')->group(function () {
+
+    // Listar ventas
+    Route::get('/', [VentasController::class, 'index'])
+         ->name('api.ventas.index');
+
+    // Crear nueva venta (POST /api/ventas)
+    Route::post('/', [VentasController::class, 'store'])
+         ->name('api.ventas.store');
+
+
+    // Actualizar una venta (PUT /api/ventas/{id})
+    Route::put('/{id}', [VentasController::class, 'update'])
+         ->name('api.ventas.update');
+
+    // Eliminar (lógicamente) una venta (DELETE /api/ventas/{id})
+    Route::delete('/{id}', [VentasController::class, 'destroy'])
+         ->name('api.ventas.destroy');
+
+    // Rutas para detalles y formas de pago (si las mantienes):
+    Route::get('/detalles/{cod_documento}/{seri_venta}/{nume_venta}',
+        [VentasController::class, 'showDetails']
+    )->name('api.ventas.detalles');
+
+    Route::get('/formas-pago/{cod_documento}/{seri_venta}/{nume_venta}',
+        [VentasController::class, 'showPaymentMethods']
+    )->name('api.ventas.formas_pago');
+
+    // Si manejas estadísticas, gráficas, etc.
+    Route::get('/grafica-ventas-por-dia', [VentasController::class, 'graficaVentasPorDia'])
+         ->name('api.ventas.grafica_por_dia');
+    Route::get('/grafica-ventas-por-formapago', [VentasController::class, 'graficaVentasPorFormaPago'])
+         ->name('api.ventas.grafica_por_formapago');
+    Route::get('/grafica-ventas-por-articulo', [VentasController::class, 'graficaVentasPorArticulo'])
+         ->name('api.ventas.grafica_por_articulo');
+    Route::get('/grafica-top-articulos', [VentasController::class, 'graficaTopArticulos'])
+         ->name('api.ventas.grafica_top_articulos');
+
+    Route::get('/estadisticas-generales', [VentasController::class, 'estadisticasGenerales'])
+         ->name('api.ventas.estadisticas_generales');
+
+    Route::get('/detalle-completo/{cod_documento}/{seri_venta}/{nume_venta}',
+        [VentasController::class, 'getDetalleCompleto']
+    )->name('api.ventas.detalle_completo');
+});
 
      /**
      * PROVEEDORES

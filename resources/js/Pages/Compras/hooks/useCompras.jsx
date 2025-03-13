@@ -6,6 +6,7 @@ export function useCompras() {
   const [loading, setLoading] = useState(true);
 
   // Cargar la lista de compras
+  // Carga de facturaciones
   const loadFacturaciones = () => {
     setLoading(true);
     fetch('/api/facturacion')
@@ -23,6 +24,7 @@ export function useCompras() {
   useEffect(() => {
     loadFacturaciones();
   }, []);
+
 
   // Crear una nueva compra
   const crearCompra = async (nuevaCompra) => {
@@ -106,5 +108,7 @@ export function useCompras() {
     crearCompra,
     editarCompra,
     eliminarCompra,
+    loadFacturaciones,
+
   };
 }

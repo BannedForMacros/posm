@@ -49,18 +49,6 @@ const VentasIndex = () => {
   // Columnas
   const columns = [
     {
-      name: 'Comprobante',
-      selector: row => `${row.COD_DOCUMENTO}-${row.SERI_VENTA}-${row.NUME_VENTA}`,
-      sortable: true,
-      width: '200px',
-    },
-    {
-      name: 'Cliente',
-      selector: row => row.RAZONSOCIALCLI || 'Cliente no registrado',
-      sortable: true,
-      grow: 2,
-    },
-    {
       name: 'Fecha',
       selector: row => row.FEMI_VENTA,
       sortable: true,
@@ -78,6 +66,18 @@ const VentasIndex = () => {
           </div>
         );
       },
+    },
+    {
+      name: 'Comprobante',
+      selector: row => `${row.COD_DOCUMENTO}-${row.SERI_VENTA}-${row.NUME_VENTA}`,
+      sortable: true,
+      width: '200px',
+    },
+    {
+      name: 'Cliente',
+      selector: row => row.RAZONSOCIALCLI || 'Cliente no registrado',
+      sortable: true,
+      grow: 2,
     },
     {
       name: 'Total',
@@ -190,7 +190,6 @@ const VentasIndex = () => {
             columns={columns}
             data={filteredItems}
             customStyles={customStyles}
-            pagination
             paginationResetDefaultPage={resetPaginationToggle}
             progressPending={loading}
             progressComponent={<div className="text-center p-4">Cargando ventas...</div>}

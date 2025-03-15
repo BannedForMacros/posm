@@ -139,5 +139,47 @@ class InventarioInicialController extends Controller
             ], 500);
         }
     }
+
+    public function registrarMinMax(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['error' => 'Usuario no autenticado'], 401);
+        }
+
+        // Validaciones mínimas
+        $request->validate([
+            'almacen_id'   => 'required|integer',
+            'cod_articulo' => 'required|integer',
+            'stock_minimo' => 'nullable|numeric',
+            'stock_maximo' => 'nullable|numeric'
+        ]);
+
+        try {
+            // Convertir '' a NULL si deseas
+            $stockMin = $request->input('stock_minimo') === '' ? null : $request->input('stock_minimo');
+            $stockMax = $request->input('stock_maximo') === '' ? null : $request->input('stock_maximo');
+
+            // Llamar al SP
+            DB::select('CALL sp_registrarStockMinMax(?, ?, ?, ?, ?)', [
+                $user->ruc,
+                $request->almacen_id,
+                $request->cod_articulo,
+                $stockMin ?? 0, // si deseas guardar 0 en caso de null
+                $stockMax ?? 0  // o lo que gustes
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Stock mínimo/máximo asignado correctamente'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error'   => 'Error al asignar stock mínimo/máximo',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
     

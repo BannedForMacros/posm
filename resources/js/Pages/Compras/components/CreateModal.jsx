@@ -15,7 +15,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
   const [nuevaCompra, setNuevaCompra] = useState({
     tipo_documento: '',
     fecha: '',
-    num_serie: '',
+    num_serie: '',         // seguirá siendo string, ahora en el input será text
     num_documento: '',
     cod_proveedor: '',
     nombre_proveedor: '',
@@ -23,34 +23,29 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     detalles: [],
   });
 
-  // Eliminamos el estado de operacionId y operaciones
-  // const [operacionId, setOperacionId] = useState('');
   const [almacenId, setAlmacenId] = useState('');
-
-  // Eliminamos operaciones y solo dejamos almacenes
-  // const [operaciones, setOperaciones] = useState([]);
   const [almacenes, setAlmacenes] = useState([]);
+  const [tipoDocumentos, setTipoDocumentos] = useState([]); // Estado para tipos de documento
 
-  // Para modales de búsqueda
+  // Modales de búsqueda
   const [isProveedorModalOpen, setIsProveedorModalOpen] = useState(false);
   const [isArticuloModalOpen, setIsArticuloModalOpen] = useState(false);
 
-  // Guardar índice del detalle que estamos editando (al seleccionar producto)
+  // Índice del detalle en edición
   const [detalleIndexEnEdicion, setDetalleIndexEnEdicion] = useState(null);
 
-  // Referencia al input de cantidad para hacer focus cuando se seleccione un artículo
-  const cantidadRefs = useRef([]); 
+  // Referencias para hacer focus en la cantidad
+  const cantidadRefs = useRef([]);
 
-  // ======== EFECTOS ========
+  // Cargar almacenes y tipos de documento al abrir
   useEffect(() => {
     if (isOpen) {
-      // Cuando se abra el modal, reseteamos campos y cargamos almacenes
-      // (Ya no cargamos operaciones, porque se asignará en backend con ID=1)
       cargarAlmacenes();
+      cargarTipoDocumentos();
     }
   }, [isOpen]);
 
-  // Recalcular total cuando cambian los detalles
+  // Recalcular total
   useEffect(() => {
     let sum = 0;
     nuevaCompra.detalles.forEach(det => {
@@ -61,10 +56,9 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     setNuevaCompra(prev => ({ ...prev, valor_compra: sum.toFixed(2) }));
   }, [nuevaCompra.detalles]);
 
-  // ======== FUNCIONES DE CARGA DE DATOS ========
   const cargarAlmacenes = async () => {
     try {
-      const res = await fetch('/api/almacenes'); // Ajusta tu endpoint
+      const res = await fetch('/api/almacenes');
       const data = await res.json();
       setAlmacenes(data);
     } catch (error) {
@@ -72,7 +66,17 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     }
   };
 
-  // ======== HANDLERS DE DETALLES ========
+  const cargarTipoDocumentos = async () => {
+    try {
+      const res = await fetch('/api/tipo_documento'); // Ajusta la URL si es necesario
+      const data = await res.json();
+      setTipoDocumentos(data);
+    } catch (error) {
+      console.error('Error al cargar tipos de documento:', error);
+    }
+  };
+
+  // Manejo de detalles
   const agregarDetalle = () => {
     setNuevaCompra(prev => ({
       ...prev,
@@ -99,7 +103,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     });
   };
 
-  // ======== HANDLERS DE BÚSQUEDA DE PROVEEDOR / ARTÍCULO ========
+  // Buscar Proveedor
   const handleSearchProveedor = () => setIsProveedorModalOpen(true);
   const handleSelectProveedor = (prov) => {
     setNuevaCompra(prev => ({
@@ -110,12 +114,12 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     setIsProveedorModalOpen(false);
   };
 
+  // Buscar Artículo
   const handleSearchArticulo = (index) => {
     setDetalleIndexEnEdicion(index);
     setIsArticuloModalOpen(true);
   };
   const handleSelectArticulo = (art) => {
-    // Insertamos en la fila indexEnEdicion
     setNuevaCompra(prev => {
       const copia = [...prev.detalles];
       copia[detalleIndexEnEdicion] = {
@@ -125,11 +129,9 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
       };
       return { ...prev, detalles: copia };
     });
-
-    // Cerramos modal
     setIsArticuloModalOpen(false);
 
-    // Hacemos focus al input de "cantidad"
+    // Focus en cantidad
     setTimeout(() => {
       if (cantidadRefs.current[detalleIndexEnEdicion]) {
         cantidadRefs.current[detalleIndexEnEdicion].focus();
@@ -137,9 +139,8 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     }, 100);
   };
 
-  // ======== CREAR COMPRA ========
+  // Crear compra
   const handleCrearCompra = async () => {
-    // Validaciones mínimas
     if (!nuevaCompra.tipo_documento) {
       Swal.fire('Advertencia', 'Seleccione un tipo de documento', 'warning');
       return;
@@ -156,7 +157,6 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
       Swal.fire('Advertencia', 'Debe agregar al menos un detalle', 'warning');
       return;
     }
-    // Eliminamos la verificación de operacionId, ya que se asigna en backend (ID=1)
     if (!almacenId) {
       Swal.fire('Advertencia', 'Seleccione el almacén donde ingresará la compra', 'warning');
       return;
@@ -175,10 +175,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
           cantidad: det.cantidad,
           precio_unitario: det.precio_unitario,
         })),
-
-        // Campos para generar SIEMPRE el documento de almacén
         generar_almacen: true,
-        // operacion_id: 1 => Se asigna en backend, no lo mandamos
         almacen_id: parseInt(almacenId, 10),
       };
 
@@ -200,7 +197,6 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
       const data = await res.json();
       Swal.fire('Éxito', data.message || 'Compra creada correctamente', 'success');
 
-      // Si el padre definió onCreated, llamarlo
       if (onCreated) onCreated();
       onClose();
 
@@ -209,7 +205,6 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     }
   };
 
-  // ======== RENDER ========
   return (
     <ModalGrande isOpen={isOpen} onClose={onClose} title="Crear Nueva Compra">
       <div className="w-full mx-auto space-y-6 p-4">
@@ -231,9 +226,11 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
                   }
                 >
                   <option value="">Seleccione...</option>
-                  <option value="1">Factura</option>
-                  <option value="2">Boleta</option>
-                  <option value="3">Otro</option>
+                  {tipoDocumentos.map(td => (
+                    <option key={td.id} value={td.id}>
+                      {td.descripcion}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -253,7 +250,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
               <label className="block">
                 <span className="text-sm font-semibold">N° Serie:</span>
                 <input
-                  type="number"
+                  type="text"
                   className="mt-1 block w-full border p-2"
                   value={nuevaCompra.num_serie}
                   onChange={(e) =>
@@ -275,7 +272,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
               </label>
             </div>
 
-            {/* SOLO Almacén (Quitamos Operación) */}
+            {/* Almacén */}
             <div>
               <label className="block text-sm font-semibold mb-1">
                 Almacén

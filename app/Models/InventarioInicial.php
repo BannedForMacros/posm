@@ -14,6 +14,8 @@ class InventarioInicial extends Model
         'almacen_id',
         'cod_articulo',
         'stock_inicial',
+        'stock_minimo',
+        'stock_maximo',
         'activo'
     ];
 

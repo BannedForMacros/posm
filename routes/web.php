@@ -18,6 +18,11 @@ use App\Http\Controllers\Api\OperacionController;
 use App\Http\Controllers\Api\WarehouseDocumentController;
 use App\Http\Controllers\Api\WarehouseDocumentDetailController;
 use App\Http\Controllers\Api\InventarioController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DetalleFacturacionController;
+use App\Http\Controllers\Api\TipoDocumentoController;
+
+
 
 
 
@@ -38,6 +43,13 @@ Route::middleware(['auth'])->group(function () {
             'user' => auth()->user(),
         ]);
     })->name('dashboard');
+
+
+Route::prefix('api/dashboard')->group(function () {
+    Route::get('/graficos', [DashboardController::class, 'dashboardGraficos'])
+         ->name('api.dashboard.graficos');
+});
+
 
     
 // *********************************************************************
@@ -156,6 +168,9 @@ Route::prefix('api/almacenes')->group(function() {
             
             Route::get('/stock', [InventarioInicialController::class, 'showStockInicial'])
                 ->name('api.inventario_inicial.show_stock');
+            
+            Route::post('/registrar-minmax', [InventarioInicialController::class, 'registrarMinMax'])
+                ->name('api.inventario_inicial.registrar_minmax');
         });
 
 
@@ -214,6 +229,12 @@ Route::prefix('api/almacenes')->group(function() {
         Route::delete('/{codarticulo}', [ArticuloManageController::class, 'destroy'])
             ->name('api.articulos_manage.destroy');
     });
+    // TIPO DOCUMENTO : 
+
+Route::get('tipo_documento', [TipoDocumentoController::class, 'index']);
+Route::get('/api/tipo_documento', [TipoDocumentoController::class, 'index']);
+
+
 
     /**
      * COMPRAS (antes “facturacion”)
@@ -241,6 +262,24 @@ Route::prefix('api/almacenes')->group(function() {
             Route::put('/{id}', [FacturacionController::class, 'update']);
             Route::delete('/{id}', [FacturacionController::class, 'destroy']);
         });
+    
+    // Rutas para DetalleFacturacion
+    Route::prefix('detalle-facturacion')->group(function() {
+        // GET /api/detalle-facturacion?facturacion_id=...
+        Route::get('/', [DetalleFacturacionController::class, 'index']);
+        
+        // POST /api/detalle-facturacion
+        Route::post('/', [DetalleFacturacionController::class, 'store']);
+        
+        // GET /api/detalle-facturacion/{id}
+        Route::get('/{id}', [DetalleFacturacionController::class, 'show']);
+        
+        // PUT /api/detalle-facturacion/{id}
+        Route::put('/{id}', [DetalleFacturacionController::class, 'update']);
+        
+        // DELETE /api/detalle-facturacion/{id}
+        Route::delete('/{id}', [DetalleFacturacionController::class, 'destroy']);
+    });
     });
     
     Route::get('/facturacion', function() {
@@ -276,6 +315,8 @@ Route::prefix('api/ventas')->group(function () {
     // Crear nueva venta (POST /api/ventas)
     Route::post('/', [VentasController::class, 'store'])
          ->name('api.ventas.store');
+             // Actualizar una venta (PUT /api/ventas/{id})
+
 
 
     // Actualizar una venta (PUT /api/ventas/{id})

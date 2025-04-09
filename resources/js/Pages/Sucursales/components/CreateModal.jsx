@@ -1,6 +1,6 @@
-// src/components/modals/CreateModal.jsx
+// src/Pages/Sucursales/components/CreateModal.jsx
 import React, { useState } from 'react';
-import Modal from '@/Components/ui/Modal'; // Ajusta la ruta según tu proyecto
+import Modal from '@/Components/ui/Modal';
 import { useSucursales } from '../hooks/useSucursales';
 
 const CreateModal = ({ isOpen, onClose }) => {
@@ -10,18 +10,22 @@ const CreateModal = ({ isOpen, onClose }) => {
     direccion: ''
   });
 
-  const handleCrear = () => {
-    // Obtenemos el token CSRF del meta tag
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    crearSucursal(form, token);
+  const handleCrear = async () => {
+    await crearSucursal(form);
+    // Limpiar el formulario y cerrar el modal
+    setForm({ nombre: '', direccion: '' });
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => {
+        setForm({ nombre: '', direccion: '' });
+        onClose();
+      }}
       title="Crear Sucursal"
     >
       <div className="space-y-4 p-4">
@@ -34,7 +38,6 @@ const CreateModal = ({ isOpen, onClose }) => {
             onChange={e => setForm({ ...form, nombre: e.target.value })}
           />
         </label>
-
         <label className="block">
           <span className="text-sm font-semibold">Dirección:</span>
           <input
@@ -44,12 +47,14 @@ const CreateModal = ({ isOpen, onClose }) => {
             onChange={e => setForm({ ...form, direccion: e.target.value })}
           />
         </label>
-
         <div className="flex justify-end space-x-3 mt-4">
           <button
             type="button"
             className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500 transition"
-            onClick={onClose}
+            onClick={() => {
+              setForm({ nombre: '', direccion: '' });
+              onClose();
+            }}
           >
             Cancelar
           </button>

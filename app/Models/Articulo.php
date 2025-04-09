@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Articulo extends Model
 {
     protected $table = 'articulos';        // Tabla real en la DB
-    protected $primaryKey = 'codarticulo'; // PK distinta a 'id'
+    protected $primaryKey = 'codarticulo';   // PK distinta a 'id'
     public $timestamps = false;            // No tiene created_at/updated_at
 
     protected $fillable = [
@@ -37,5 +37,14 @@ class Articulo extends Model
     public function warehouseDetails()
     {
         return $this->hasMany(WarehouseDocumentDetail::class, 'cod_articulo', 'codarticulo');
+    }
+
+    /**
+     * Relación con el modelo Familia.
+     * Cada artículo pertenece a una familia (campo 'codfamilia').
+     */
+    public function familia()
+    {
+        return $this->belongsTo(\App\Models\Familia::class, 'codfamilia', 'codfamilia');
     }
 }

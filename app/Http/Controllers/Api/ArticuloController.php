@@ -3,48 +3,47 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use App\Models\Articulo;
+use App\Models\Familia;
 
 class ArticuloController extends Controller
 {
-    /**
-     * Devuelve la lista de artículos utilizando el procedimiento almacenado.
-     *
-     * URL: /api/articulos
-     */
     public function index(Request $request)
     {
         try {
-            // 1) Obtener el usuario autenticado
-            $user = $request->user(); // o auth()->user()
+            // 1) Obtener usuario
+            $user = $request->user();
             if (!$user) {
-                return response()->json(['error' => 'Usuario no autenticado'], 401);
+                return redirect()->route('login');
             }
 
+            // 2) Filtrar por ruc
             $rucUsuario = $user->ruc;
 
-            // 2) Llamar al procedimiento almacenado con el ruc, 
-            //    o hacer una consulta directa filtrando por 'ruc = $rucUsuario'.
-
-            // EJEMPLO A: Usando un SP que filtra por RUC
-            // $articulos = DB::select("CALL ObtenerArticulosPorRuc(?)", [$rucUsuario]);
-
-            // EJEMPLO B: Consulta directa (si no usas SP):
-            $articulos = DB::table('articulos')
+            // 3) Obtener artículos con la relación familia
+            $articulos = Articulo::with('familia')
                 ->where('ruc', $rucUsuario)
                 ->get();
 
-            return response()->json($articulos);
+            // 4) Obtener familias
+            $familias = Familia::where('ruc', $rucUsuario)->get();
+
+            // IMPORTANTE: No pongas 'return response()->json(...)' aquí,
+            // porque corta la ejecución y no llega al Inertia::render.
+
+            // 5) Retornar la vista con Inertia
+            return Inertia::render('ArticulosManage/Index', [
+                'articulos' => $articulos,
+                'familias'  => $familias,
+            ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'error'   => 'Error al obtener los artículos',
-                'message' => $e->getMessage()
-            ], 500);
+            // Manejo de error
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
-    
 
     /**
      * Devuelve el detalle de un artículo en base a su ID utilizando un procedimiento almacenado.

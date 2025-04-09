@@ -30,11 +30,14 @@ use App\Http\Controllers\Api\TipoDocumentoController;
 
 
 
-
 // Ruta raíz
 Route::get('/', function () {
     return Inertia::render('Welcome');
 });
+
+Route::get('/login', function () {
+    return Inertia::render('Auth/Login');
+})->name('login');
 
 // Rutas protegidas por autenticación
 Route::middleware(['auth'])->group(function () {
@@ -389,5 +392,6 @@ Route::prefix('api/articulos')->group(function () {
     Route::get('/{id}', [ArticuloController::class, 'show'])
         ->name('api.articulos.show');
 });
+
 
 require __DIR__.'/auth.php';

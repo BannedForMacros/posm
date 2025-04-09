@@ -49,6 +49,7 @@ class ArticuloManageController extends Controller
             'codarticulo'    => 'required|integer|unique:articulos,codarticulo',
             'codfamilia'     => 'required|string|max:6',
             'nombrearticulo' => 'required|string|max:200',
+            'codsubfamilia'  => 'required|string|max:200',
             // etc. 
         ]);
 

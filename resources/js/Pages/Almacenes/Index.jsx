@@ -1,13 +1,43 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, memo } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
 import { Input } from '@/components/ui/input';
-import { Plus, Edit, Eye, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { useAlmacenes } from './hooks/useAlmacenes';
 import { CreateModal } from './components/CreateModal';
 import { EditModal } from './components/EditModal';
 import { customStyles } from './styles/tableStyles';
+
+// Componente SearchComponent memoizado
+const SearchComponent = memo(({ filterText, setFilterText, inputRef }) => {
+  return (
+    <div className="mb-4">
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Buscar almacenes..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+          className="pl-10 w-full"
+        />
+        <button
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setFilterText('');
+            inputRef.current?.focus();
+          }}
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          style={{ visibility: filterText ? 'visible' : 'hidden' }}
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+});
 
 const AlmacenesIndex = () => {
   const {
@@ -24,10 +54,9 @@ const AlmacenesIndex = () => {
     eliminarAlmacen,
   } = useAlmacenes();
 
-  // Estado para el buscador
   const [filterText, setFilterText] = useState('');
+  const inputRef = useRef(null);
 
-  // Filtrar datos
   const filteredData = useMemo(() => {
     if (!filterText) return almacenes;
     
@@ -40,7 +69,6 @@ const AlmacenesIndex = () => {
     });
   }, [almacenes, filterText]);
 
-  // Definimos columnas
   const columns = [
     {
       name: 'Nombre',
@@ -79,30 +107,6 @@ const AlmacenesIndex = () => {
     }
   ];
 
-  // Componente para el buscador
-  const SearchComponent = () => (
-    <div className="mb-4">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <Input
-          type="text"
-          placeholder="Buscar almacenes..."
-          value={filterText}
-          onChange={e => setFilterText(e.target.value)}
-          className="pl-10 w-full"
-        />
-        {filterText && (
-          <button
-            onClick={() => setFilterText('')}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <MainLayout>
       <div className="container mx-auto p-6 bg-white shadow-lg rounded-lg">
@@ -117,7 +121,11 @@ const AlmacenesIndex = () => {
           />
         </div>
 
-        <SearchComponent />
+        <SearchComponent 
+          filterText={filterText}
+          setFilterText={setFilterText}
+          inputRef={inputRef}
+        />
 
         <DataTable
           columns={columns}
@@ -131,14 +139,12 @@ const AlmacenesIndex = () => {
           pointerOnHover
         />
 
-        {/* Modal Crear */}
         <CreateModal
           isOpen={isCrearModalOpen}
           onClose={() => setIsCrearModalOpen(false)}
           onSubmit={crearAlmacen}
         />
 
-        {/* Modal Editar */}
         <EditModal
           isOpen={isEditarModalOpen}
           onClose={() => setIsEditarModalOpen(false)}

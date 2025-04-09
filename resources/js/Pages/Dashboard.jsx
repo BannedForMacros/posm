@@ -147,9 +147,10 @@ function VentasPorSucursalChart({ data }) {
 }
 
 export default function Dashboard() {
-  // Filtros
+  // Filtros: 
+  // Se inicia el mes en null ("Todos Meses") y el año con el año actual
   const [selectedMonth, setSelectedMonth] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   // Carga y error
   const [loading, setLoading] = useState(true);
@@ -198,7 +199,6 @@ export default function Dashboard() {
         setVentasPorDia(ventasPorDia);
         setVentasPorFormaPago(ventasPorFormaPago);
         setTopArticulos(topArticulos);
-
         // Guardar la nueva data
         setVentasPorSucursal(ventasPorSucursal);
       } else {
@@ -257,23 +257,30 @@ export default function Dashboard() {
     }
   };
 
+  // Generación dinámica de opciones para años
+  const currentYear = new Date().getFullYear();
+  const startYear = 2020;
+  const yearOptions = [];
+  for (let year = startYear; year <= currentYear; year++) {
+    yearOptions.push(year);
+  }
+
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
-        
         {/* Filtros */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
             <select
-              className="px-4 py-2 border rounded"
+              className="w-48 px-4 py-2 border rounded"  // Se asigna un ancho mayor (w-48)
               value={selectedMonth ?? ''}
               onChange={(e) => {
                 const val = e.target.value === '' ? null : parseInt(e.target.value);
                 setSelectedMonth(val);
               }}
             >
-              <option value="">-- Todos Meses --</option>
+              <option value="">Todos los Meses</option>
               <option value="1">Enero</option>
               <option value="2">Febrero</option>
               <option value="3">Marzo</option>
@@ -288,22 +295,26 @@ export default function Dashboard() {
               <option value="12">Diciembre</option>
             </select>
 
+            {/* Se inserta la palabra "del" entre ambos selects */}
+            <span className="self-center">del</span>
+
             <select
-              className="px-4 py-2 border rounded"
+              className="px-7 py-2 border rounded"
               value={selectedYear ?? ''}
               onChange={(e) => {
                 const val = e.target.value === '' ? null : parseInt(e.target.value);
                 setSelectedYear(val);
               }}
             >
-              <option value="">-- Todos Años --</option>
-              <option value="2020">2020</option>
-              <option value="2021">2021</option>
-              <option value="2022">2022</option>
-              <option value="2023">2023</option>
-              {/* Agrega más si quieres */}
+              <option value="">Todos los Años</option>
+              {yearOptions.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
             </select>
           </div>
+
         </div>
 
         {/* Cargando / Error */}
@@ -350,21 +361,7 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold mb-2">Ventas por Día</h2>
                 {ventasPorDia.length > 0 ? (
                   <div style={{ height: '320px' }}>
-                    <Bar
-                      data={{
-                        labels: ventasPorDia.map(item => `Día ${item.Dia || ''}`),
-                        datasets: [
-                          {
-                            label: 'Ventas por Día',
-                            data: ventasPorDia.map(item => parseFloat(item.MontoTotal) || 0),
-                            backgroundColor: 'rgba(75,192,192,0.5)',
-                            borderColor: 'rgba(75,192,192,1)',
-                            borderWidth: 1
-                          }
-                        ]
-                      }}
-                      options={barOptions}
-                    />
+                    <Bar data={barData} options={barOptions} />
                   </div>
                 ) : (
                   <p className="text-gray-500">No hay datos</p>
@@ -376,21 +373,7 @@ export default function Dashboard() {
                 <h2 className="text-xl font-bold mb-2">Ventas por Forma de Pago</h2>
                 {ventasPorFormaPago.length > 0 ? (
                   <div style={{ height: '320px' }}>
-                    <Doughnut
-                      data={{
-                        labels: ventasPorFormaPago.map(item => item.FormaPago || 'N/A'),
-                        datasets: [
-                          {
-                            label: 'Forma de Pago',
-                            data: ventasPorFormaPago.map(item => parseFloat(item.MontoTotal) || 0),
-                            backgroundColor: [
-                              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'
-                            ]
-                          }
-                        ]
-                      }}
-                      options={doughnutOptions}
-                    />
+                    <Doughnut data={doughnutData} options={doughnutOptions} />
                   </div>
                 ) : (
                   <p className="text-gray-500">No hay datos</p>

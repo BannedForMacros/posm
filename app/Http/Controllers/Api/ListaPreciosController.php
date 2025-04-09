@@ -92,8 +92,22 @@ class ListaPreciosController extends Controller
     public function showDetalle($id)
     {
         try {
+            // Llamamos al SP para obtener el detalle de la lista
             $detalle = DB::select("CALL sp_obtenerDetalleListaPrecios(?)", [$id]);
-            return response()->json($detalle);
+            
+            // Realizamos una consulta adicional para obtener el nombre real de la lista
+            $lista = DB::table('lista_precios')->where('id', $id)->first();
+            
+            // Si se encuentra el registro, obtenemos su nombre; de lo contrario, usamos un fallback
+            $nombre_lista = $lista && isset($lista->nombre)
+                ? $lista->nombre
+                : "Lista #".$id;
+                
+            // Retornamos un objeto que contiene el nombre y el detalle
+            return response()->json([
+                'nombre_lista' => $nombre_lista,
+                'detalle' => $detalle
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Error al obtener detalle',
@@ -101,6 +115,7 @@ class ListaPreciosController extends Controller
             ], 500);
         }
     }
+    
 
     /**
      * PUT /api/listaprecios/detalle/{id}

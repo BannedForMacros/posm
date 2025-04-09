@@ -1,10 +1,12 @@
 // src/Pages/Sucursales/components/CreateModal.jsx
 import React, { useState } from 'react';
 import Modal from '@/Components/ui/Modal';
+<<<<<<< HEAD
 import { useSucursales } from '../hooks/useSucursales';
+=======
+>>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
 
-const CreateModal = ({ isOpen, onClose }) => {
-  const { crearSucursal } = useSucursales();
+const CreateModal = ({ isOpen, onClose, onCreated, crearSucursal }) => {
   const [form, setForm] = useState({
     nombre: '',
     direccion: ''
@@ -12,7 +14,13 @@ const CreateModal = ({ isOpen, onClose }) => {
 
   const handleCrear = async () => {
     await crearSucursal(form);
+<<<<<<< HEAD
     // Limpiar el formulario y cerrar el modal
+=======
+    // Invoca el callback para notificar al padre
+    if (onCreated) onCreated();
+    // Limpia el formulario y cierra el modal
+>>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
     setForm({ nombre: '', direccion: '' });
     onClose();
   };

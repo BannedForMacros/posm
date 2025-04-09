@@ -44,6 +44,11 @@ class ArticuloController extends Controller
             return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
 
     /**
      * Devuelve el detalle de un artículo en base a su ID utilizando un procedimiento almacenado.

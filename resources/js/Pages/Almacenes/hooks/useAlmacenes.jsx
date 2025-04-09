@@ -91,7 +91,7 @@ export function useAlmacenes() {
   const eliminarAlmacen = async (id) => {
     const confirm = await Swal.fire({
       title: '¿Estás seguro?',
-      text: 'Esta acción eliminará lógicamente el almacén.',
+      text: 'Esta acción eliminará el almacén.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Sí, eliminar',

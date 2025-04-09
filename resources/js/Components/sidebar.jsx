@@ -1,142 +1,164 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from '@inertiajs/inertia-react';
 import { Inertia } from '@inertiajs/inertia';
 import {
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
-  BookOpen,
-  ShoppingCart,
-  Settings,
-  LogOut,
+  Monitor,
   Boxes,
   FolderTree,
-  Monitor,
   Users,
+  Building2,
+  Building,
+  Factory,
   FileText,
-  Home,
-  Package, // Para Inventario
-  Building2, // Para Sucursales
-  Building,  // Para Almacenes
-  Factory,   // Para Operaciones
-  ClipboardList, // Para Lista de Precios
-} from "lucide-react";
+  ShoppingCart,
+  ClipboardList,
+  Package,
+  Settings,
+  LogOut,
+} from 'lucide-react';
 
-const Sidebar = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showMantenimiento, setShowMantenimiento] = useState(false);
+/**
+ * Intenta leer del localStorage el estado del sidebar:
+ * - si está colapsado
+ * - cuáles submenús están abiertos
+ */
+function loadSidebarState() {
+  try {
+    const stored = localStorage.getItem('sidebarState');
+    return stored
+      ? JSON.parse(stored)
+      : { isCollapsed: false, showMantenimiento: false, showInventario: false };
+  } catch {
+    return { isCollapsed: false, showMantenimiento: false, showInventario: false };
+  }
+}
 
-  // Si necesitas más submenús (ej. para Almacenes, Operaciones, etc.), puedes agregar
-  // más flags de estado si quieres controlar su apertura individual.
-  const [showInventario, setShowInventario] = useState(false);
+export default function Sidebar() {
+  // Estado: colapsado/expandido y submenús
+  const [sidebarState, setSidebarState] = useState(loadSidebarState);
+  const { isCollapsed, showMantenimiento, showInventario } = sidebarState;
 
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  // Guardar cambios en localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarState', JSON.stringify(sidebarState));
+  }, [sidebarState]);
 
-  // Definimos los ítems de navegación
+  // Ruta actual (para resaltar ítem activo)
+  const currentPath =
+    typeof window !== 'undefined' ? window.location.pathname : '';
+
+  // Alternar colapsar/expandir
+  const toggleCollapse = () => {
+    setSidebarState((prev) => ({ ...prev, isCollapsed: !prev.isCollapsed }));
+  };
+
+  // Lista de navegación
   const navItems = [
     {
       icon: <LayoutDashboard size={20} />,
       label: 'Dashboard',
-      href: '/dashboard'
+      href: '/dashboard',
     },
     {
       icon: <Monitor size={20} />,
       label: 'Mantenimiento',
       type: 'submenu',
       isOpen: showMantenimiento,
-      toggle: () => setShowMantenimiento(!showMantenimiento),
+      toggle: () =>
+        setSidebarState((prev) => ({
+          ...prev,
+          showMantenimiento: !prev.showMantenimiento,
+        })),
       items: [
         {
           icon: <Boxes size={20} />,
           label: 'Artículos (CRUD)',
-          href: '/articulos-manage'
+          href: '/articulos-manage',
         },
         {
           icon: <FolderTree size={20} />,
           label: 'Familias',
-          href: '/familias'
+          href: '/familias',
         },
         {
           icon: <Users size={20} />,
           label: 'Proveedores',
-          href: '/proveedores'
+          href: '/proveedores',
         },
         {
           icon: <Building2 size={20} />,
           label: 'Sucursales',
-          href: '/sucursales'
+          href: '/sucursales',
         },
         {
           icon: <Building size={20} />,
           label: 'Almacenes',
-          href: '/almacenes'
+          href: '/almacenes',
         },
-        {
-          icon: <Factory size={20} />,
-          label: 'Operaciones',
-          href: '/api/operaciones' // O si creas vista Inertia: '/operaciones'
-        },
-      ]
-    },
-    {
-      icon: <BookOpen size={20} />,
-      label: 'Artículos (Público)',
-      href: '/articulos'
+
+      ],
     },
     {
       icon: <FileText size={20} />,
       label: 'Compras',
-      href: '/facturacion'
+      href: '/facturacion',
     },
     {
       icon: <ShoppingCart size={20} />,
       label: 'Ventas',
-      href: '/ventas'
+      href: '/ventas',
     },
     {
       icon: <ClipboardList size={20} />,
       label: 'Lista de Precios',
-      href: '/lista-precios'
+      href: '/lista-precios',
     },
     {
       icon: <Package size={20} />,
       label: 'Inventario',
       type: 'submenu',
       isOpen: showInventario,
-      toggle: () => setShowInventario(!showInventario),
+      toggle: () =>
+        setSidebarState((prev) => ({
+          ...prev,
+          showInventario: !prev.showInventario,
+        })),
       items: [
         {
           icon: <Package size={20} />,
           label: 'Inventario Inicial',
-          href: '/inventario-inicial'
+          href: '/inventario-inicial',
         },
         {
           icon: <Package size={20} />,
           label: 'Stock Inventario',
-          href: '/inventario' // Ajusta si tu vista principal de inventario es /inventario
+          href: '/inventario',
         },
         {
           icon: <Package size={20} />,
           label: 'Docs. de Almacén',
-          href: '/warehouse-documents'
+          href: '/warehouse-documents',
         },
         {
           icon: <Package size={20} />,
           label: 'Movimientos Almacén',
-          href: '/warehouse-movements'
+          href: '/warehouse-movements',
         },
-      ]
+      ],
     },
     {
       icon: <Settings size={20} />,
       label: 'Configuración',
-      href: '/configuracion'
+      href: '/configuracion',
     },
   ];
 
-  // Función para renderizar un ítem
+  // Renderizar ítems
   const renderNavItem = (item) => {
-    // Si es un submenú
+    // Submenú
     if (item.type === 'submenu') {
       return (
         <div key={item.label} className="space-y-1">
@@ -147,32 +169,41 @@ const Sidebar = () => {
           >
             <div className="flex items-center gap-3">
               {item.icon}
-              <span className={`${isCollapsed ? 'hidden' : 'block'} transition-all duration-300`}>
+              {/* Label (oculto si está colapsado) */}
+              <span
+                className={`${
+                  isCollapsed ? 'hidden' : 'block'
+                } transition-all duration-300`}
+              >
                 {item.label}
               </span>
             </div>
+            {/* Flecha que gira si abierto */}
             {!isCollapsed && (
               <ChevronRight
                 size={16}
-                className={`transition-transform duration-200 ${item.isOpen ? 'rotate-90' : ''}`}
+                className={`transition-transform duration-200 ${
+                  item.isOpen ? 'rotate-90' : ''
+                }`}
               />
             )}
           </button>
 
+          {/* Subítems: se ven solo si submenú está abierto y barra NO está colapsada */}
           {item.isOpen && !isCollapsed && (
             <div className="ml-4 space-y-1">
               {item.items.map((subitem) => (
                 <Link
                   key={subitem.href}
                   href={subitem.href}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-200
-                    ${currentPath === subitem.href 
-                      ? 'bg-orange-600 text-white' 
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-200 ${
+                    currentPath === subitem.href
+                      ? 'bg-orange-600 text-white'
                       : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                    }`}
+                  }`}
                 >
                   {subitem.icon}
-                  <span className="block">{subitem.label}</span>
+                  <span>{subitem.label}</span>
                 </Link>
               ))}
             </div>
@@ -186,14 +217,19 @@ const Sidebar = () => {
       <Link
         key={item.href}
         href={item.href}
-        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-200
-          ${currentPath === item.href 
-            ? 'bg-orange-600 text-white' 
+        className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors duration-200 ${
+          currentPath === item.href
+            ? 'bg-orange-600 text-white'
             : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-          }`}
+        }`}
       >
         {item.icon}
-        <span className={`${isCollapsed ? 'hidden' : 'block'} transition-all duration-300`}>
+        {/* Label (oculto si colapsado) */}
+        <span
+          className={`${
+            isCollapsed ? 'hidden' : 'block'
+          } transition-all duration-300`}
+        >
           {item.label}
         </span>
       </Link>
@@ -201,58 +237,61 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="relative">
-      <div className={`
-        fixed top-0 left-0 h-full bg-gray-900 text-gray-100 
+    <aside
+      className={`
+        fixed top-0 left-0 h-screen 
+        bg-gray-900 text-gray-100
+        z-50
         transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-20' : 'w-64'}
       `}
-      >
-        <div className="relative py-5">
-          <div className="flex justify-center items-center">
-            <h1 className={`font-bold transition-all duration-300 ${isCollapsed ? 'text-sm' : 'text-xl'}`}>
-              {isCollapsed ? 'P-M' : 'POS.M'}
-            </h1>
-          </div>
-
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="absolute top-1/2 -right-3 transform -translate-y-1/2
-              w-6 h-6 flex items-center justify-center rounded-full
-              bg-orange-600 hover:bg-orange-700 text-white transition-all duration-200
-              shadow-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+    >
+      <div className="flex flex-col h-full">
+        {/* Header (logo + botón colapsar) */}
+        <div className="flex items-center justify-between px-4 py-5">
+          <h1
+            className={`font-bold transition-all duration-300 ${
+              isCollapsed ? 'text-sm' : 'text-xl'
+            }`}
           >
-            {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+            {isCollapsed ? 'P-M' : 'POS.M'}
+          </h1>
+          {/* Botón para colapsar/expandir siempre visible */}
+          <button onClick={toggleCollapse} className="text-gray-100">
+            {isCollapsed ? (
+              <ChevronRight size={16} />
+            ) : (
+              <ChevronLeft size={16} />
+            )}
           </button>
         </div>
 
-        <div className="px-4">
-          <div className="h-px bg-gray-800 w-full" />
-        </div>
+        <div className="h-px bg-gray-800" />
 
-        <nav className="p-4 space-y-2">
+        {/* Menú principal scrollable */}
+        <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-2">
           {navItems.map(renderNavItem)}
         </nav>
 
-        <div className="px-4">
-          <div className="h-px bg-gray-800 w-full" />
-        </div>
-
-        <div className="absolute bottom-4 w-full px-4">
+        {/* Botón de Cerrar Sesión al final */}
+        <div className="px-4 py-4">
           <button
             onClick={() => Inertia.post(route('logout'))}
-            className="w-full px-4 py-2 rounded-lg flex items-center gap-3
-              text-gray-300 hover:bg-gray-800 hover:text-white transition-colors duration-200"
+            className="w-full flex items-center gap-3 px-4 py-2 rounded-lg 
+              transition-colors duration-200 text-gray-300 hover:bg-gray-800 hover:text-white
+            "
           >
             <LogOut size={20} />
-            <span className={`${isCollapsed ? 'hidden' : 'block'} transition-all duration-300`}>
+            <span
+              className={`${
+                isCollapsed ? 'hidden' : 'block'
+              } transition-all duration-300`}
+            >
               Cerrar Sesión
             </span>
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
-};
-
-export default Sidebar;
+}

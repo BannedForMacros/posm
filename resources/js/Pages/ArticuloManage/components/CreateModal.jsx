@@ -126,7 +126,11 @@ export const CreateModal = ({
             onChange={(e) =>
               setNuevoArticulo({
                 ...nuevoArticulo,
+<<<<<<< HEAD
                 codarticulo: e.target.value
+=======
+                codarticulo: parseInt(e.target.value, 10) || ''
+>>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
               })
             }
             required

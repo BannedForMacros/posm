@@ -27,27 +27,32 @@ const ViewAndEditModal = ({ isOpen, onClose, listaPreciosId }) => {
   }, [isOpen, listaPreciosId]);
 
   // Función para cargar la lista y su detalle
-  const cargarDetalle = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/listaprecios/detalle/${listaPreciosId}`);
-      const data = await res.json();
-      // data podría ser un array con { id, nombre_articulo, precio, ... }
-      // o un objeto con { nombre_lista, detalle: [...] }. Ajusta según tu backend.
-
-      // Supongamos que si es un array, no tenemos el nombre de la lista.
-      // Si tu backend sí retorna el nombre, ajústalo:
-      setNombreLista(`Lista #${listaPreciosId}`); 
-      
+// Función para cargar la lista y su detalle
+const cargarDetalle = async () => {
+  setLoading(true);
+  try {
+    const res = await fetch(`/api/listaprecios/detalle/${listaPreciosId}`);
+    const data = await res.json();
+    // Si la respuesta es un objeto que tiene el nombre de la lista y el detalle,
+    // usamos esos valores; de lo contrario usamos el fallback
+    if (data.nombre_lista) {
+      setNombreLista(data.nombre_lista);
+      setDetallesOriginal(data.detalle);
+      setDetallesFiltrados(data.detalle);
+    } else {
+      // Si la respuesta es un array, asumimos que no viene el nombre, y usamos el fallback.
+      setNombreLista(`Lista #${listaPreciosId}`);
       setDetallesOriginal(data);
       setDetallesFiltrados(data);
-      setBusqueda('');
-    } catch (error) {
-      console.error('Error al cargar detalle:', error);
-    } finally {
-      setLoading(false);
     }
-  };
+    setBusqueda('');
+  } catch (error) {
+    console.error('Error al cargar detalle:', error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Filtrar en tiempo real
   useEffect(() => {

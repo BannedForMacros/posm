@@ -46,7 +46,7 @@ const WelcomePage = () => {
             animate={{ scale: 1 }}
             transition={{ duration: 0.5 }}
           >
-            POSM
+            POS-M
             <span className="text-orange-600"> Punto de Venta</span>
           </motion.h1>
           <motion.p 
@@ -55,7 +55,7 @@ const WelcomePage = () => {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            La solución integral para la gestión de múltiples restaurantes en una sola plataforma
+            La solución integral para la gestión de múltiples puntos de venta en una sola plataforma
           </motion.p>
           
           <motion.div 

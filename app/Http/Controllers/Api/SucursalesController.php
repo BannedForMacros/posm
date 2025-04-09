@@ -19,11 +19,17 @@ class SucursalesController extends Controller
             return response()->json(['error' => 'Usuario no autenticado'], 401);
         }
         
-
         try {
             // Llamamos al SP para leer sucursales
             $sucursales = DB::select("CALL usp_sucursales_read(?)", [$user->ruc]);
-            return response()->json($sucursales);
+    
+            // Filtramos las sucursales para devolver solo aquellas con estado = 1
+            $sucursalesFiltradas = array_filter($sucursales, function($sucursal) {
+                return $sucursal->estado == 1;
+            });
+    
+            // array_filter preserve las claves, se recomienda reindexarlas con array_values
+            return response()->json(array_values($sucursalesFiltradas));
         } catch (\Exception $e) {
             return response()->json([
                 'error'   => 'Error al obtener sucursales',
@@ -31,6 +37,7 @@ class SucursalesController extends Controller
             ], 500);
         }
     }
+    
 
     /**
      * Crear una nueva sucursal.
@@ -42,29 +49,43 @@ class SucursalesController extends Controller
             'nombre'    => 'required|string|max:100',
             'direccion' => 'nullable|string|max:200'
         ]);
-
+    
         $user = $request->user();
         if (!$user) {
             return response()->json(['error' => 'Usuario no autenticado'], 401);
         }
-
+    
         try {
+            DB::beginTransaction();
+    
+            // Ejecuta el stored procedure para insertar la sucursal
             DB::statement("CALL usp_sucursales_create(?, ?, ?)", [
                 $user->ruc,
                 $request->nombre,
                 $request->direccion
             ]);
+    
+            // Después de insertar, obtenemos el registro recién creado.
+            // Se asume que la tabla se llama "sucursales" y que el registro
+            // más reciente para el usuario es el insertado.
+            $resultado = DB::select("SELECT * FROM sucursal WHERE user_ruc = ? ORDER BY id DESC LIMIT 1", [$user->ruc]);
+    
+            DB::commit();
+    
             return response()->json([
                 'success' => true,
+                'data'    => $resultado[0] ?? null,
                 'message' => 'Sucursal creada correctamente'
             ]);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'error'   => 'Error al crear sucursal',
                 'message' => $e->getMessage()
             ], 500);
         }
     }
+    
 
     /**
      * Actualizar sucursal.

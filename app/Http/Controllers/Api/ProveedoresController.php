@@ -34,7 +34,7 @@ class ProveedoresController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'ruc'          => 'required|string|size:11|unique:Proveedores,ruc',
+            'ruc'          => 'required|string|size:11|unique:proveedores,ruc',
             'razon_social' => 'required|string|max:200',
             'direccion'    => 'nullable|string|max:200',
             'telefono'     => 'nullable|string|max:20',

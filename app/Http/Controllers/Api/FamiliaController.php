@@ -55,6 +55,13 @@ class FamiliaController extends Controller
             'codfamilia'  => 'required|string|max:6|unique:familia,codfamilia',
             'familia'     => 'required|string|max:200',
             'subfamilia'  => 'nullable|string|max:200',
+        ], [
+            // Usamos $request->input('codfamilia') para obtener el valor ingresado
+            'codfamilia.unique' => 'El código de familia (' . $request->input('codfamilia') . ') que has introducido ya existe.',            
+            'codfamilia.required' => 'El campo código de la familia es obligatorio.',
+            'familia.required' => 'El campo familia es obligatorio.',
+            'familia.string' => 'El campo familia debe ser una cadena de texto.',
+            'familia.max' => 'El campo familia no puede tener más de 200 caracteres.',
         ]);
 
         $familia = new Familia();

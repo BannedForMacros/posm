@@ -50,6 +50,7 @@ Route::prefix('api/dashboard')->group(function () {
          ->name('api.dashboard.graficos');
 });
 
+Route::get('/subfamilias', [ArticuloController::class, 'subfamilias']);
 
     
 // *********************************************************************

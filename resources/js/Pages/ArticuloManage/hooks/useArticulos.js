@@ -1,12 +1,7 @@
+// useArticulos.js
 import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 
-/**
- * Hook personalizado para manejar la lógica de artículos:
- * - Carga inicial de artículos
- * - Crear, actualizar, eliminar
- * - Manejadores de estado para modales
- */
 export const useArticulos = () => {
   const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
   const [articulos, setArticulos] = useState([]);
@@ -26,7 +21,7 @@ export const useArticulos = () => {
     estado: 1
   });
 
-  // Cargar artículos desde la API
+  // 1. Cargar artículos (datos reales desde la BD)
   const fetchArticulos = async () => {
     try {
       const response = await fetch('/api/articulos-manage', {
@@ -45,8 +40,8 @@ export const useArticulos = () => {
     }
   };
 
-  // Crear artículo
-  const crearArticulo = async (nuevoArticulo) => {
+  // 2. Crear artículo: recargamos la lista en lugar de añadir localmente
+  const crearArticulo = async (articuloAEnviar) => {
     try {
       const response = await fetch('/api/articulos-manage', {
         method: 'POST',
@@ -55,23 +50,26 @@ export const useArticulos = () => {
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify(nuevoArticulo)
+        body: JSON.stringify(articuloAEnviar)
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Error al crear artículo');
 
-      // Agregamos el artículo recién creado al array local
-      setArticulos(prev => [...prev, data.data]);
-
+      // En lugar de setArticulos([...prev, data.data]), recargamos
+      await fetchArticulos();
       setIsCrearModalOpen(false);
       Swal.fire('¡Éxito!', 'Artículo creado correctamente', 'success');
+      
+      // Retornamos el artículo creado, por si deseas usarlo en el componente
+      return data.data;
     } catch (error) {
       Swal.fire('Error', error.message, 'error');
+      return null;
     }
   };
 
-  // Actualizar artículo
+  // 3. Actualizar artículo: igual, recargamos lista
   const actualizarArticulo = async (articulo) => {
     try {
       const response = await fetch(`/api/articulos-manage/${articulo.codarticulo}`, {
@@ -87,10 +85,7 @@ export const useArticulos = () => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Error al actualizar artículo');
 
-      // Reemplazamos el artículo modificado en el array local
-      setArticulos(prev =>
-        prev.map(a => (a.codarticulo === articulo.codarticulo ? data.data : a))
-      );
+      await fetchArticulos();
       setIsEditarModalOpen(false);
       Swal.fire('¡Éxito!', 'Artículo actualizado correctamente', 'success');
     } catch (error) {
@@ -98,7 +93,7 @@ export const useArticulos = () => {
     }
   };
 
-  // Eliminar artículo
+  // 4. Eliminar artículo: igual, recargamos lista
   const eliminarArticulo = async (codarticulo) => {
     try {
       const result = await Swal.fire({
@@ -123,8 +118,7 @@ export const useArticulos = () => {
 
         if (!response.ok) throw new Error('Error al eliminar artículo');
 
-        // Quitamos el artículo eliminado del array local
-        setArticulos(prev => prev.filter(a => a.codarticulo !== codarticulo));
+        await fetchArticulos();
         Swal.fire('¡Eliminado!', 'Artículo eliminado correctamente', 'success');
       }
     } catch (error) {
@@ -136,10 +130,6 @@ export const useArticulos = () => {
   useEffect(() => {
     fetchArticulos();
   }, []);
-
-  // (Opcional) Si quisieras filtrar artículos desde aquí,
-  // podrías exponer un estado searchTerm y un filteredArticulos,
-  // pero normalmente se hace en el componente Index.jsx.
 
   return {
     articulos,

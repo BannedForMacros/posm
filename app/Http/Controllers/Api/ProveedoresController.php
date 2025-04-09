@@ -15,7 +15,7 @@ class ProveedoresController extends Controller
     {
         // Listar proveedores activos
         try {
-            $proveedores = DB::table('Proveedores')
+            $proveedores = DB::table('proveedores')
                 ->where('estado', 1)
                 ->orderBy('created_at', 'desc')
                 ->get();

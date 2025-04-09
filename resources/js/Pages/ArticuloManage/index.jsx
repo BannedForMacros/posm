@@ -1,3 +1,4 @@
+// ArticulosManage.jsx
 import React, { useState, useMemo } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
@@ -33,14 +34,13 @@ const ArticulosManage = () => {
     setNuevoArticulo,
     crearArticulo,
     actualizarArticulo,
-    eliminarArticulo
+    eliminarArticulo,
   } = useArticulos();
 
-  // 3) Definimos estado local para el término de búsqueda
+  // 3) Estado local para el término de búsqueda
   const [searchTerm, setSearchTerm] = useState('');
 
   // 4) Filtramos los artículos en tiempo real
-  //    Buscamos por codarticulo o nombrearticulo, ajusta según tu preferencia
   const filteredArticulos = useMemo(() => {
     if (!searchTerm) return articulos;
     const lowerSearch = searchTerm.toLowerCase();
@@ -61,7 +61,11 @@ const ArticulosManage = () => {
     {
       name: 'Familia',
       selector: row => row.codfamilia,
-      // Podrías mostrar row.familia?.familia si tienes la relación cargada
+      sortable: true,
+    },
+    {
+      name: 'SubFamilia',
+      selector: row => row.codsubfamilia,
       sortable: true,
     },
     {
@@ -110,13 +114,28 @@ const ArticulosManage = () => {
     },
   ];
 
+  // Manejar la creación del artículo
+  const handleCreateArticulo = async () => {
+    // Simplemente llamamos a crearArticulo y esperamos su respuesta
+    const articuloCreado = await crearArticulo(nuevoArticulo);
+
+    // Si quieres hacer algo adicional con el artículo creado,
+    // puedes verificar aquí si artículoCreado no es null:
+    if (articuloCreado) {
+      // El artículo sí se guardó en la BD
+    }
+
+    // Cerramos modal y limpiamos campos
+    setIsCrearModalOpen(false);
+    setNuevoArticulo({});
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6 bg-white shadow-lg rounded-lg">
         {/* Encabezado */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
           <h1 className="text-3xl font-bold text-gray-800">Gestión de Artículos</h1>
-
           {/* Campo de Búsqueda */}
           <div className="flex items-center gap-2">
             <input
@@ -139,7 +158,6 @@ const ArticulosManage = () => {
         {/* DataTable de artículos */}
         <DataTable
           columns={columns}
-          // En lugar de data={articulos}, usamos data={filteredArticulos}
           data={filteredArticulos}
           customStyles={customStyles}
           progressPending={loading}
@@ -155,7 +173,7 @@ const ArticulosManage = () => {
           onClose={() => setIsCrearModalOpen(false)}
           nuevoArticulo={nuevoArticulo}
           setNuevoArticulo={setNuevoArticulo}
-          onSubmit={() => crearArticulo(nuevoArticulo)}
+          onSubmit={handleCreateArticulo}
           familias={familias}
         />
 

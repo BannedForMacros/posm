@@ -24,6 +24,9 @@ const ProveedoresIndex = () => {
   const [proveedorEditar, setProveedorEditar] = useState(null);
   const [proveedorView, setProveedorView] = useState(null);
 
+  // Estado para la query de búsqueda
+  const [searchQuery, setSearchQuery] = useState('');
+
   const columns = [
     {
       name: 'RUC',
@@ -83,6 +86,16 @@ const ProveedoresIndex = () => {
     await loadProveedores();
   }, [loadProveedores]);
 
+  // Filtrado de proveedores en función de la búsqueda
+  const filteredProveedores = proveedores.filter((proveedor) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      proveedor.ruc.toLowerCase().includes(query) ||
+      proveedor.razon_social.toLowerCase().includes(query) ||
+      proveedor.direccion.toLowerCase().includes(query)
+    );
+  });
+
   return (
     <MainLayout>
       <div className="container mx-auto p-6 bg-white shadow-lg rounded-lg">
@@ -97,11 +110,21 @@ const ProveedoresIndex = () => {
           />
         </div>
 
+        {/* Buscador en tiempo real */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-1/2 px-4 py-2 border rounded"
+          />
+        </div>
+
         <DataTable
           columns={columns}
-          data={proveedores}
+          data={filteredProveedores}
           customStyles={customStyles}
-          pagination
           progressPending={loading}
           progressComponent={<div className="text-center p-4">Cargando proveedores...</div>}
           noDataComponent={<div className="text-center p-4">No hay proveedores registrados.</div>}
@@ -116,10 +139,10 @@ const ProveedoresIndex = () => {
         />
 
         <EditModal
-        isOpen={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
-        proveedor={proveedorEditar}
-        onEdited={loadProveedores} 
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          proveedor={proveedorEditar}
+          onEdited={loadProveedores} 
         />
 
         <ViewModal

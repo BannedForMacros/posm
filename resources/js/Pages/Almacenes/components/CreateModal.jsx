@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import Modal from '@/Components/ui/Modal'; // Ajusta la ruta de tu componente Modal
-import IconButton from '@/Components/ui/IconButton'; // Para el botón "Guardar"
+import Modal from '@/Components/ui/Modal';
+import IconButton from '@/Components/ui/IconButton';
 import { XCircle } from 'lucide-react';
 
 export const CreateModal = ({ isOpen, onClose, onSubmit }) => {
@@ -11,31 +11,25 @@ export const CreateModal = ({ isOpen, onClose, onSubmit }) => {
   });
   const [sucursales, setSucursales] = useState([]);
 
-  // Cargar sucursales del usuario autenticado
   const loadSucursales = () => {
-    fetch('/api/sucursales') // Ajusta si tu ruta es distinta
+    fetch('/api/sucursales')
       .then(r => r.json())
-      .then(data => {
-        setSucursales(data);
-      })
+      .then(data => setSucursales(data))
       .catch(err => console.error('Error al cargar sucursales:', err));
   };
 
   useEffect(() => {
     if (isOpen) {
-      // Cada vez que abra el modal, limpio el form y cargo las sucursales
       setFormData({ sucursal_id: '', nombre: '', ubicacion: '' });
       loadSucursales();
     }
   }, [isOpen]);
 
   const handleCrear = () => {
-    // Validar que haya elegido sucursal
     if (!formData.sucursal_id) {
       alert('Por favor, seleccione una sucursal.');
       return;
     }
-    // Llamar a la función "onSubmit" que viene de props (hook useAlmacenes)
     onSubmit(formData);
     onClose();
   };
@@ -46,12 +40,13 @@ export const CreateModal = ({ isOpen, onClose, onSubmit }) => {
     <Modal isOpen={isOpen} onClose={onClose} title="Crear Almacén">
       <div className="p-4 space-y-4">
         {/* Seleccionar sucursal */}
-        <label className="block text-sm font-semibold">
-          Sucursal
+        <label className="block text-sm font-semibold mb-2">
+          Sucursal *
           <select
-            className="mt-1 block w-full border p-2 rounded"
+            className="mt-1 block w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
             value={formData.sucursal_id}
             onChange={(e) => setFormData({ ...formData, sucursal_id: e.target.value })}
+            required
           >
             <option value="">-- Seleccione una sucursal --</option>
             {sucursales.map((suc) => (
@@ -63,29 +58,31 @@ export const CreateModal = ({ isOpen, onClose, onSubmit }) => {
         </label>
 
         {/* Nombre del almacén */}
-        <label className="block text-sm font-semibold">
-          Nombre
+        <label className="block text-sm font-semibold mb-2">
+          Nombre *
           <input
             type="text"
-            className="mt-1 block w-full border p-2 rounded"
+            className="mt-1 block w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
             value={formData.nombre}
             onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            required
           />
         </label>
 
         {/* Ubicación */}
-        <label className="block text-sm font-semibold">
-          Ubicación
+        <label className="block text-sm font-semibold mb-2">
+          Ubicación *
           <input
             type="text"
-            className="mt-1 block w-full border p-2 rounded"
+            className="mt-1 block w-full border p-2 rounded focus:ring-2 focus:ring-blue-500"
             value={formData.ubicacion}
             onChange={(e) => setFormData({ ...formData, ubicacion: e.target.value })}
+            required
           />
         </label>
 
         {/* Botones */}
-        <div className="flex justify-end space-x-2 mt-4">
+        <div className="flex justify-end gap-3 mt-6">
           <IconButton
             icon={XCircle}
             label="Cancelar"
@@ -93,12 +90,12 @@ export const CreateModal = ({ isOpen, onClose, onSubmit }) => {
             size="md"
             onClick={onClose}
           />
-          <IconButton
-            label="Guardar"
-            variant="primary"
-            size="md"
+          <button
             onClick={handleCrear}
-          />
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+          >
+            Guardar
+          </button>
         </div>
       </div>
     </Modal>

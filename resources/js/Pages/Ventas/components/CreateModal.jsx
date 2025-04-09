@@ -1,24 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ModalGrande from '@/Components/ui/ModalGrande'; 
+import ModalGrande from '@/Components/ui/ModalGrande';
 import Swal from 'sweetalert2';
 import IconButton from '@/Components/ui/IconButton';
 import { XCircle, Plus, Search } from 'lucide-react';
 
-// En este ejemplo, NO tenemos un SearchClienteModal, 
+// En este ejemplo, NO tenemos un SearchClienteModal,
 // sino un input simple para nombreCliente o docCliente.
 import SearchArticuloModal from './SearchArticuloModal';
 
 const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
-  const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const token =
+    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+    '';
 
-  // ====== ESTADO PRINCIPAL DE LA VENTA ======
+  // Estado principal de la venta con fecha por defecto (fecha actual)
   const [nuevaVenta, setNuevaVenta] = useState({
-    cod_documento: '01',  // "01"=Factura, "03"=Boleta, etc.
+    cod_documento: '01', // "01"=Factura, "03"=Boleta, etc.
     seri_venta: '',
     nume_venta: '',
-    fecha: '',
-    // Reemplazamos id_cliente y nombre_cliente
-    // por un par de campos manuales
+    // Se asigna la fecha actual en formato yyyy-mm-dd
+    fecha: new Date().toISOString().split('T')[0],
+    // Usamos campos manuales para el cliente
     cliente_nombre: '',
     cliente_documento: '',
     total_venta: '0.00',
@@ -41,7 +43,7 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   // Efecto: al abrir modal => cargar almacenes, etc.
   useEffect(() => {
     if (isOpen) {
-      // Resetear o cargar datos si lo deseas
+      // Puedes resetear o cargar datos si lo deseas
       cargarAlmacenes();
     }
   }, [isOpen]);
@@ -49,12 +51,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   // Recalcular total cuando cambian los detalles
   useEffect(() => {
     let sum = 0;
-    nuevaVenta.detalles.forEach(det => {
+    nuevaVenta.detalles.forEach((det) => {
       const qty = parseFloat(det.cantidad) || 0;
       const pu = parseFloat(det.precio_unitario) || 0;
       sum += qty * pu;
     });
-    setNuevaVenta(prev => ({ ...prev, total_venta: sum.toFixed(2) }));
+    setNuevaVenta((prev) => ({ ...prev, total_venta: sum.toFixed(2) }));
   }, [nuevaVenta.detalles]);
 
   // Cargar almacenes
@@ -70,17 +72,22 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
 
   // ===== DETALLES =====
   const agregarDetalle = () => {
-    setNuevaVenta(prev => ({
+    setNuevaVenta((prev) => ({
       ...prev,
       detalles: [
         ...prev.detalles,
-        { cod_articulo: '', nombre_articulo: '', cantidad: '', precio_unitario: '' },
-      ],
+        {
+          cod_articulo: '',
+          nombre_articulo: '',
+          cantidad: '',
+          precio_unitario: ''
+        }
+      ]
     }));
   };
 
   const eliminarDetalle = (index) => {
-    setNuevaVenta(prev => {
+    setNuevaVenta((prev) => {
       const copia = [...prev.detalles];
       copia.splice(index, 1);
       return { ...prev, detalles: copia };
@@ -88,7 +95,7 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   };
 
   const handleChangeDetalle = (index, field, value) => {
-    setNuevaVenta(prev => {
+    setNuevaVenta((prev) => {
       const copia = [...prev.detalles];
       copia[index] = { ...copia[index], [field]: value };
       return { ...prev, detalles: copia };
@@ -102,12 +109,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   };
 
   const handleSelectArticulo = (art) => {
-    setNuevaVenta(prev => {
+    setNuevaVenta((prev) => {
       const copia = [...prev.detalles];
       copia[detalleIndexEnEdicion] = {
         ...copia[detalleIndexEnEdicion],
         cod_articulo: art.codarticulo,
-        nombre_articulo: art.nombrearticulo || art.nombrecorto,
+        nombre_articulo: art.nombrearticulo || art.nombrecorto
       };
       return { ...prev, detalles: copia };
     });
@@ -132,7 +139,6 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
       Swal.fire('Advertencia', 'Ingrese la fecha de la venta', 'warning');
       return;
     }
-    // En vez de id_cliente, tienes nombre y doc
     if (!nuevaVenta.cliente_nombre) {
       Swal.fire('Advertencia', 'Ingrese el nombre del cliente', 'warning');
       return;
@@ -153,29 +159,26 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
         seri_venta: nuevaVenta.seri_venta,
         nume_venta: nuevaVenta.nume_venta,
         fecha: nuevaVenta.fecha,
-        // Campos del cliente
         cliente_nombre: nuevaVenta.cliente_nombre,
         cliente_documento: nuevaVenta.cliente_documento,
         total_venta: nuevaVenta.total_venta,
-        detalles: nuevaVenta.detalles.map(det => ({
+        detalles: nuevaVenta.detalles.map((det) => ({
           cod_articulo: det.cod_articulo,
           cantidad: det.cantidad,
-          precio_unitario: det.precio_unitario,
+          precio_unitario: det.precio_unitario
         })),
-
-        // Generar doc. de almacén
         generar_almacen: true,
-        almacen_id: parseInt(almacenId, 10),
+        almacen_id: parseInt(almacenId, 10)
       };
 
       const res = await fetch('/api/ventas', {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -188,7 +191,6 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
 
       if (onCreated) onCreated();
       onClose();
-
     } catch (err) {
       Swal.fire('Error', err.message, 'error');
     }
@@ -198,9 +200,7 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   return (
     <ModalGrande isOpen={isOpen} onClose={onClose} title="Crear Nueva Venta">
       <div className="w-full mx-auto space-y-6 p-4">
-        
         <div className="flex flex-col lg:flex-row gap-6">
-          
           {/* Columna Izquierda */}
           <div className="w-full lg:w-1/3 space-y-4 min-w-[400px]">
             {/* Tipo Documento + Fecha */}
@@ -210,7 +210,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                 <select
                   className="mt-1 block w-full border rounded p-2"
                   value={nuevaVenta.cod_documento}
-                  onChange={(e) => setNuevaVenta({ ...nuevaVenta, cod_documento: e.target.value })}
+                  onChange={(e) =>
+                    setNuevaVenta({
+                      ...nuevaVenta,
+                      cod_documento: e.target.value
+                    })
+                  }
                 >
                   <option value="">Seleccione...</option>
                   <option value="01">Factura</option>
@@ -225,7 +230,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                   type="date"
                   className="mt-1 block w-full border p-2"
                   value={nuevaVenta.fecha}
-                  onChange={(e) => setNuevaVenta({ ...nuevaVenta, fecha: e.target.value })}
+                  onChange={(e) =>
+                    setNuevaVenta({
+                      ...nuevaVenta,
+                      fecha: e.target.value
+                    })
+                  }
                 />
               </label>
             </div>
@@ -238,17 +248,27 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                   type="text"
                   className="mt-1 block w-full border p-2"
                   value={nuevaVenta.seri_venta}
-                  onChange={(e) => setNuevaVenta({ ...nuevaVenta, seri_venta: e.target.value })}
+                  onChange={(e) =>
+                    setNuevaVenta({
+                      ...nuevaVenta,
+                      seri_venta: e.target.value
+                    })
+                  }
                 />
               </label>
 
               <label className="block">
-                <span className="text-sm font-semibold">N° Venta:</span>
+                <span className="text-sm font-semibold">Correlativo:</span>
                 <input
                   type="text"
                   className="mt-1 block w-full border p-2"
                   value={nuevaVenta.nume_venta}
-                  onChange={(e) => setNuevaVenta({ ...nuevaVenta, nume_venta: e.target.value })}
+                  onChange={(e) =>
+                    setNuevaVenta({
+                      ...nuevaVenta,
+                      nume_venta: e.target.value
+                    })
+                  }
                 />
               </label>
             </div>
@@ -259,10 +279,10 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
               <select
                 className="mt-1 block w-full border rounded p-2"
                 value={almacenId}
-                onChange={e => setAlmacenId(e.target.value)}
+                onChange={(e) => setAlmacenId(e.target.value)}
               >
                 <option value="">Seleccione...</option>
-                {almacenes.map(alm => (
+                {almacenes.map((alm) => (
                   <option key={alm.id} value={alm.id}>
                     {alm.nombre}
                   </option>
@@ -278,7 +298,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                 className="mt-1 block w-full border p-2"
                 placeholder="Ej: Juan Perez"
                 value={nuevaVenta.cliente_nombre}
-                onChange={(e) => setNuevaVenta({ ...nuevaVenta, cliente_nombre: e.target.value })}
+                onChange={(e) =>
+                  setNuevaVenta({
+                    ...nuevaVenta,
+                    cliente_nombre: e.target.value
+                  })
+                }
               />
             </div>
             <div>
@@ -288,7 +313,12 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                 className="mt-1 block w-full border p-2"
                 placeholder="Ej: 12345678"
                 value={nuevaVenta.cliente_documento}
-                onChange={(e) => setNuevaVenta({ ...nuevaVenta, cliente_documento: e.target.value })}
+                onChange={(e) =>
+                  setNuevaVenta({
+                    ...nuevaVenta,
+                    cliente_documento: e.target.value
+                  })
+                }
               />
             </div>
           </div>
@@ -352,7 +382,9 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                             step="0.01"
                             className="border rounded p-1 w-full text-xs text-right"
                             value={det.cantidad}
-                            onChange={(e) => handleChangeDetalle(idx, 'cantidad', e.target.value)}
+                            onChange={(e) =>
+                              handleChangeDetalle(idx, 'cantidad', e.target.value)
+                            }
                           />
                         </td>
                         <td className="p-1">
@@ -361,7 +393,9 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
                             step="0.01"
                             className="border rounded p-1 w-full text-xs text-right"
                             value={det.precio_unitario}
-                            onChange={(e) => handleChangeDetalle(idx, 'precio_unitario', e.target.value)}
+                            onChange={(e) =>
+                              handleChangeDetalle(idx, 'precio_unitario', e.target.value)
+                            }
                           />
                         </td>
                         <td className="p-1 text-right">{subtotal}</td>
@@ -405,7 +439,7 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
           </div>
         </div>
 
-        {/* Botones finales */}
+        {/* Botones Finales */}
         <div className="flex justify-end space-x-3 mt-4 border-t bg-gray-50 p-4">
           <button
             type="button"

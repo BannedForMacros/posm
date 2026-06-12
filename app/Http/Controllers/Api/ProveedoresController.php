@@ -17,6 +17,7 @@ class ProveedoresController extends Controller
         try {
             $proveedores = DB::table('proveedores')
                 ->where('estado', 1)
+                ->where('user_ruc', auth()->user()->ruc)
                 ->orderBy('created_at', 'desc')
                 ->get();
             return response()->json($proveedores);
@@ -34,7 +35,7 @@ class ProveedoresController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'ruc'          => 'required|string|size:11|unique:Proveedores,ruc',
+            'ruc'          => 'required|string|size:11|unique:proveedores,ruc',
             'razon_social' => 'required|string|max:200',
             'direccion'    => 'nullable|string|max:200',
             'telefono'     => 'nullable|string|max:20',
@@ -79,9 +80,23 @@ class ProveedoresController extends Controller
     /**
      * GET /api/proveedores/{id}
      */
+    /**
+     * Verifica que el proveedor pertenezca a la empresa del usuario autenticado.
+     */
+    private function perteneceAlUsuario($id): bool
+    {
+        return DB::table('proveedores')
+            ->where('id', $id)
+            ->where('user_ruc', auth()->user()->ruc)
+            ->exists();
+    }
+
     public function show($id)
     {
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Proveedor no encontrado'], 404);
+            }
             $proveedorArr = DB::select("CALL sp_obtenerProveedor(?)", [$id]);
             if (empty($proveedorArr)) {
                 return response()->json(['error' => 'Proveedor no encontrado o inactivo'], 404);
@@ -108,6 +123,10 @@ class ProveedoresController extends Controller
         ]);
 
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Proveedor no encontrado'], 404);
+            }
+
             DB::beginTransaction();
             DB::statement("CALL sp_actualizarProveedor(?, ?, ?, ?, ?)", [
                 $id,
@@ -136,6 +155,9 @@ class ProveedoresController extends Controller
     public function destroy($id)
     {
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Proveedor no encontrado'], 404);
+            }
             DB::statement("CALL sp_eliminarProveedor(?)", [$id]);
             return response()->json([
                 'success' => true,

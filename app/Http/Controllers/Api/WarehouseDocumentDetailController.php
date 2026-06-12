@@ -21,13 +21,16 @@ class WarehouseDocumentDetailController extends Controller
         $productId = $request->query('product_id');
     
         try {
-            // Carga la relación con warehouseDocument (almacen, operacion, user) y articulo
+            // Carga la relación con warehouseDocument (almacen, operacion, user) y articulo.
+            // Solo movimientos de la empresa del usuario autenticado.
             $query = WarehouseDocumentDetail::with([
                 'warehouseDocument.almacen',
                 'warehouseDocument.operacion',
                 'warehouseDocument.user',
                 'articulo'
-            ]);
+            ])->whereHas('warehouseDocument', function($q) use ($request) {
+                $q->where('ruc', $request->user()->ruc);
+            });
     
             // Filtro por almacén
             if ($almacenId) {

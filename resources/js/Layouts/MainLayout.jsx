@@ -1,6 +1,6 @@
 // resources/js/Layouts/MainLayout.jsx
 import React from 'react'
-import Sidebar from '@/Components/Sidebar'  // Ajusta la ruta si tu Sidebar está en otro sitio
+import Sidebar from '@/Components/sidebar'  // Ajusta la ruta si tu Sidebar está en otro sitio
 
 export default function MainLayout({ children }) {
   return (

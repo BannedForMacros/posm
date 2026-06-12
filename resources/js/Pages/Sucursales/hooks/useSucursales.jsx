@@ -143,6 +143,7 @@ const crearSucursal = async (nuevaSucursal) => {
   return {
     sucursales,
     loading,
+    loadSucursales,
     crearSucursal,
     editarSucursal,
     eliminarSucursal

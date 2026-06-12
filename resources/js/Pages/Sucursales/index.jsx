@@ -5,7 +5,7 @@ import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
 import EstadoIndicador from '@/Components/ui/EstadoIndicador'; // Asegúrate que la ruta sea correcta
 import { Plus, Eye, Edit, Trash2, Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/Components/ui/Input';
 
 import { useSucursales } from './hooks/useSucursales';
 import { customStyles } from './styles/tableStyles';
@@ -21,6 +21,7 @@ const SucursalesIndex = () => {
     loading,
     eliminarSucursal,
     crearSucursal,
+    editarSucursal,
     loadSucursales,
   } = useSucursales();
 
@@ -169,6 +170,8 @@ const SucursalesIndex = () => {
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           sucursal={sucursalEditar}
+          editarSucursal={editarSucursal}
+          onEdited={loadSucursales}
         />
 
         <ViewModal

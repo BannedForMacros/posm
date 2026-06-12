@@ -19,8 +19,9 @@ class InventarioController extends Controller
         $almacenId = $request->query('almacen_id');
         $search    = $request->query('search');
 
-        // Carga inventario con relaciones
-        $query = Inventario::with(['almacen', 'articulo']);
+        // Carga inventario con relaciones (solo de la empresa del usuario)
+        $query = Inventario::with(['almacen', 'articulo'])
+            ->where('ruc', $request->user()->ruc);
 
         // Filtrar por almacen_id
         if ($almacenId) {

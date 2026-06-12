@@ -33,7 +33,8 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
-            'ruc' => 'required|numeric|unique:users,ruc',
+            // RUC peruano: exactamente 11 dígitos (la columna es varchar(11))
+            'ruc' => 'required|digits:11|unique:users,ruc',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 

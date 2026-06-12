@@ -37,6 +37,30 @@ class AlmacenesController extends Controller
      * Crea un almacén + pivote con sp_crearAlmacenConSucursal(?)
      * Body: { sucursal_id, nombre, ubicacion }
      */
+    /**
+     * Verifica que la sucursal pertenezca a la empresa del usuario autenticado.
+     */
+    private function sucursalPerteneceAlUsuario($sucursalId): bool
+    {
+        return DB::table('sucursal')
+            ->where('id', $sucursalId)
+            ->where('user_ruc', auth()->user()->ruc)
+            ->exists();
+    }
+
+    /**
+     * Verifica que el almacén pertenezca (vía sucursal_almacen) a una
+     * sucursal de la empresa del usuario autenticado.
+     */
+    private function almacenPerteneceAlUsuario($almacenId): bool
+    {
+        return DB::table('sucursal_almacen')
+            ->join('sucursal', 'sucursal_almacen.sucursal_id', '=', 'sucursal.id')
+            ->where('sucursal_almacen.almacen_id', $almacenId)
+            ->where('sucursal.user_ruc', auth()->user()->ruc)
+            ->exists();
+    }
+
     public function store(Request $request)
     {
         $request->validate([
@@ -44,6 +68,10 @@ class AlmacenesController extends Controller
             'nombre'      => 'required|string|max:100',
             'ubicacion'   => 'required|string|max:200'
         ]);
+
+        if (!$this->sucursalPerteneceAlUsuario($request->sucursal_id)) {
+            return response()->json(['error' => 'Sucursal no encontrada'], 404);
+        }
 
         try {
             $result = DB::select("CALL sp_crearAlmacenConSucursal(?, ?, ?)", [
@@ -79,6 +107,10 @@ class AlmacenesController extends Controller
             'ubicacion' => 'required|string|max:200'
         ]);
 
+        if (!$this->almacenPerteneceAlUsuario($id)) {
+            return response()->json(['error' => 'Almacén no encontrado'], 404);
+        }
+
         try {
             DB::statement("CALL sp_actualizarAlmacen(?, ?, ?)", [
                 $id,
@@ -104,6 +136,10 @@ class AlmacenesController extends Controller
      */
     public function destroy($id)
     {
+        if (!$this->almacenPerteneceAlUsuario($id)) {
+            return response()->json(['error' => 'Almacén no encontrado'], 404);
+        }
+
         try {
             DB::statement("CALL sp_eliminarAlmacen(?)", [$id]);
 

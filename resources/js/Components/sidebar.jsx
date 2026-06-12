@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from '@inertiajs/inertia-react';
-import { Inertia } from '@inertiajs/inertia';
+import { Link, router } from '@inertiajs/react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -276,7 +275,7 @@ export default function Sidebar() {
         {/* Botón de Cerrar Sesión al final */}
         <div className="px-4 py-4">
           <button
-            onClick={() => Inertia.post(route('logout'))}
+            onClick={() => router.post(route('logout'))}
             className="w-full flex items-center gap-3 px-4 py-2 rounded-lg 
               transition-colors duration-200 text-gray-300 hover:bg-gray-800 hover:text-white
             "

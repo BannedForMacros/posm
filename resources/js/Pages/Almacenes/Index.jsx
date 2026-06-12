@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, memo } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/Components/ui/Input';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { useAlmacenes } from './hooks/useAlmacenes';
 import { CreateModal } from './components/CreateModal';

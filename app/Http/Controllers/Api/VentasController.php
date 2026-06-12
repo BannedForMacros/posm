@@ -85,6 +85,35 @@ class VentasController extends Controller
      
          DB::beginTransaction();
          try {
+             // 0) Validar stock disponible ANTES de registrar la salida:
+             //    antes se truncaba a 0 en silencio y el inventario quedaba
+             //    descuadrado respecto al documento de almacén.
+             $sinStock = [];
+             foreach ($request->detalles as $det) {
+                 $invent = DB::table('inventario')
+                     ->where('ruc', $rucUsuario)
+                     ->where('almacen_id', $request->almacen_id)
+                     ->where('cod_articulo', $det['cod_articulo'])
+                     ->first();
+
+                 $disponible = $invent->stock ?? 0;
+                 if ($disponible < $det['cantidad']) {
+                     $sinStock[] = [
+                         'cod_articulo' => $det['cod_articulo'],
+                         'solicitado'   => $det['cantidad'],
+                         'disponible'   => $disponible,
+                     ];
+                 }
+             }
+
+             if (!empty($sinStock)) {
+                 DB::rollBack();
+                 return response()->json([
+                     'error'    => 'Stock insuficiente para uno o más artículos',
+                     'detalles' => $sinStock,
+                 ], 422);
+             }
+
              // 1) Crear la cabecera en warehouse_document
              $warehouseDoc = new WarehouseDocument();
              // USAR RUC DEL USUARIO, no del request
@@ -126,21 +155,13 @@ class VentasController extends Controller
                          ->where('cod_articulo', $det['cod_articulo'])
                          ->first();
      
-                     if ($invent) {
-                         // restar
-                         $nuevoStock = max(0, $invent->stock - $det['cantidad']);
-                         DB::table('inventario')
-                             ->where('id', $invent->id)
-                             ->update([
-                                 'stock'      => $nuevoStock,
-                                 'updated_at' => now()
-                             ]);
-                     } else {
-                         // Si no existía, puedes manejarlo como quieras:
-                         // - Error: "No hay stock" 
-                         // - O interpretarlo como stock=0 y se pone en negativo
-                         //   si permites sobregiro, etc.
-                     }
+                     // El stock ya fue validado arriba: aquí siempre existe y alcanza
+                     DB::table('inventario')
+                         ->where('id', $invent->id)
+                         ->update([
+                             'stock'      => $invent->stock - $det['cantidad'],
+                             'updated_at' => now()
+                         ]);
                  }
              } elseif ($warehouseDoc->tipo_movimiento === 'INGRESO') {
                  // sumar stock (por si en algún caso es una venta que ingresa algo)
@@ -167,8 +188,10 @@ class VentasController extends Controller
     {
         try {
             // Llamar al procedimiento almacenado para obtener detalles de la venta
-            $detalles = DB::select("CALL ObtenerDetallesVenta(?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta
+            // (incluye el ruc: la PK de ventas es compuesta y la misma serie/número
+            // puede existir en otra empresa).
+            $detalles = DB::select("CALL ObtenerDetallesVenta(?, ?, ?, ?)", [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($detalles);
         } catch (\Exception $e) {
@@ -193,8 +216,9 @@ class VentasController extends Controller
     {
         try {
             // Llamar al procedimiento almacenado para obtener formas de pago
-            $formasPago = DB::select("CALL ObtenerFormasPagoVenta(?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta
+            // (incluye el ruc para no mezclar ventas de otra empresa)
+            $formasPago = DB::select("CALL ObtenerFormasPagoVenta(?, ?, ?, ?)", [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($formasPago);
         } catch (\Exception $e) {

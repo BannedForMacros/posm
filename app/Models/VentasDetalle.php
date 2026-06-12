@@ -9,10 +9,10 @@ class VentasDetalle extends Model
     // Nombre de la tabla en la BD
     protected $table = 'ventasdetalle';
 
-    // Clave primaria es 'id' (auto-increment)
-    protected $primaryKey = 'id';
-    public $incrementing = true;   // Indicamos que es auto-increment
-    protected $keyType = 'int';    // o 'bigint'
+    // OJO: la tabla ventasdetalle no tiene columna `id` ni `venta_id`;
+    // el vínculo con ventas es por (COD_DOCUMENTO, SERI_VENTA, NUME_VENTA).
+    protected $primaryKey = null;
+    public $incrementing = false;
 
     public $timestamps = false;    // Si no manejas created_at/updated_at
 
@@ -21,7 +21,6 @@ class VentasDetalle extends Model
      * (ajusta a tus campos reales).
      */
     protected $fillable = [
-        'venta_id',         // la columna que enlaza con ventas(id)
         'COD_DOCUMENTO',
         'SERI_VENTA',
         'NUME_VENTA',
@@ -35,12 +34,7 @@ class VentasDetalle extends Model
         // etc. según tu tabla
     ];
 
-    /**
-     * Relación con la venta (cabecera).
-     */
-    public function venta()
-    {
-        // belongsTo(<ModeloCabecera>, <columnaFK_en_esta_tabla>, <columnaPK_en_la_otratabla>)
-        return $this->belongsTo(Venta::class, 'venta_id', 'id');
-    }
+    // NOTA: no hay relación venta() — la columna venta_id no existe en esta
+    // tabla; el vínculo real es la clave compuesta (COD_DOCUMENTO,
+    // SERI_VENTA, NUME_VENTA), que Eloquent no soporta.
 }

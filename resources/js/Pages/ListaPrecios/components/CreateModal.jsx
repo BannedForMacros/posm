@@ -70,13 +70,15 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     try {
       const res = await fetch(`/api/listaprecios/detalle/${listaOrigenId}`);
       if (!res.ok) throw new Error('Error al obtener detalles de la lista origen');
-      const detalleOrigen = await res.json(); 
+      // El endpoint devuelve { nombre_lista, detalle: [...] } y el SP entrega
+      // los campos como codarticulo / precio_publico.
+      const { detalle: detalleOrigen = [] } = await res.json();
 
       // Mezclar precios
       const actualizados = articulosOriginal.map(art => {
-        const itemOrigen = detalleOrigen.find(o => o.cod_articulo === art.codarticulo);
+        const itemOrigen = detalleOrigen.find(o => o.codarticulo === art.codarticulo);
         if (itemOrigen) {
-          return { ...art, precio: itemOrigen.precio?.toString() || '' };
+          return { ...art, precio: itemOrigen.precio_publico?.toString() || '' };
         }
         return art;
       });

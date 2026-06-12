@@ -49,8 +49,8 @@ class ArticuloManageController extends Controller
             'codarticulo'    => 'required|integer|unique:articulos,codarticulo',
             'codfamilia'     => 'required|string|max:6',
             'nombrearticulo' => 'required|string|max:200',
-            'codsubfamilia'  => 'required|string|max:200',
-            // etc. 
+            // En BD codsubfamilia es varchar(6): debe ser el CÓDIGO, no el nombre
+            'codsubfamilia'  => 'required|string|max:6',
         ]);
 
         $articulo = new Articulo();
@@ -96,7 +96,10 @@ class ArticuloManageController extends Controller
 
         // Valida campos
         $request->validate([
-            'nombrearticulo' => 'required|string|max:200'
+            'nombrearticulo' => 'required|string|max:200',
+            'codfamilia'     => 'sometimes|required|string|max:6',
+            'codsubfamilia'  => 'sometimes|required|string|max:6',
+            'estado'         => 'sometimes|integer|in:0,1',
         ]);
 
         // Actualiza
@@ -104,7 +107,15 @@ class ArticuloManageController extends Controller
         $articulo->nombrecorto    = $request->nombrecorto ?? $articulo->nombrecorto;
         $articulo->stockminimo    = $request->stockminimo ?? $articulo->stockminimo;
         $articulo->stockmaximo    = $request->stockmaximo ?? $articulo->stockmaximo;
-        // ... etc.
+        if ($request->filled('codfamilia')) {
+            $articulo->codfamilia = $request->codfamilia;
+        }
+        if ($request->filled('codsubfamilia')) {
+            $articulo->codsubfamilia = $request->codsubfamilia;
+        }
+        if ($request->has('estado')) {
+            $articulo->estado = (int) $request->estado;
+        }
         $articulo->save();
 
         return response()->json([

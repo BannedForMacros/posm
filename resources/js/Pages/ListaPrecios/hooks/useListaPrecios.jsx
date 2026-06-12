@@ -11,7 +11,8 @@ export function useListaPrecios() {
     try {
       const res = await fetch('/api/listaprecios');
       const data = await res.json();
-      setListas(data);
+      // Si el backend respondió con un error {error, message}, no es un array
+      setListas(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -35,8 +36,13 @@ export function useListaPrecios() {
     if (!confirm.isConfirmed) return;
 
     try {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
       const res = await fetch(`/api/listaprecios/desactivar/${id}`, {
-        method: 'PUT'
+        method: 'PUT',
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': token
+        }
       });
       if (!res.ok) throw new Error('Error al desactivar lista');
       Swal.fire('Éxito', 'Lista desactivada', 'success');

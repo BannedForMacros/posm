@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Inertia } from '@inertiajs/inertia';
-import { Button } from '@/components/ui/Button'; // Verifica que la ruta sea correcta
+import { router } from '@inertiajs/react';
+import { Button } from '@/Components/ui/Button'; // Verifica que la ruta sea correcta
 
 const ArticuloDetalle = ({ id }) => {
   const [articulo, setArticulo] = useState(null);
@@ -53,7 +53,7 @@ const ArticuloDetalle = ({ id }) => {
         <div className="mb-4"><strong>Control de Peso:</strong> {articulo.controlpeso}</div>
         <div className="mb-4"><strong>Código Artículo Nuevo:</strong> {articulo.codartnue}</div>
         <div className="mb-4"><strong>Estado:</strong> {articulo.estado}</div>
-        <Button variant="secondary" onClick={() => Inertia.visit('/articulos')}>
+        <Button variant="secondary" onClick={() => router.visit('/articulos')}>
           Volver a la Lista
         </Button>
       </div>

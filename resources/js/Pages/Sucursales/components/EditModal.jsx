@@ -1,10 +1,11 @@
 // src/components/modals/EditModal.jsx
 import React, { useState, useEffect } from 'react';
 import Modal from '@/Components/ui/Modal';
-import { useSucursales } from '../hooks/useSucursales';
 
-const EditModal = ({ isOpen, onClose, sucursal }) => {
-  const { editarSucursal } = useSucursales();
+// editarSucursal llega por props desde el padre: si el modal creara su propia
+// instancia de useSucursales, refrescaría una copia del estado y la tabla
+// del padre quedaría desactualizada.
+const EditModal = ({ isOpen, onClose, sucursal, editarSucursal, onEdited }) => {
   const [form, setForm] = useState({
     nombre: '',
     direccion: ''
@@ -19,11 +20,13 @@ const EditModal = ({ isOpen, onClose, sucursal }) => {
     }
   }, [sucursal, isOpen]);
 
-  const handleActualizar = () => {
+  const handleActualizar = async () => {
     if (!sucursal) return;
-    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
-    editarSucursal(sucursal.id, form, token);
+    await editarSucursal(sucursal.id, form);
+    if (onEdited) {
+      await onEdited();
+    }
     onClose();
   };
 

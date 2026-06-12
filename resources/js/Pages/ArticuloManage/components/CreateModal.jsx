@@ -59,45 +59,32 @@ export const CreateModal = ({
    *     ...
    *   }
    */
-  const groupedByFamilyName = useMemo(() => {
-    const map = new Map(); // key = nombre de la familia, value = { familia, representativeCodfamilia, subfamilias: [] }
-
-    rawFamilias.forEach((row) => {
-      const { codfamilia, familia, subfamilia } = row;
-
-      // Si no existe la familia en el mapa, la creamos
-      if (!map.has(familia)) {
-        map.set(familia, {
-          familia,
-          representativeCodfamilia: codfamilia, // guardamos el primer codfamilia que veamos
-          subfamilias: []
-        });
-      }
-
-      // Si hay subfamilia, la agregamos (evitando duplicados)
-      if (subfamilia && subfamilia.trim() !== '') {
-        const entry = map.get(familia);
-        if (!entry.subfamilias.includes(subfamilia)) {
-          entry.subfamilias.push(subfamilia);
+  // Agrupación por CÓDIGO de familia: las filas con codfamilia de 6 dígitos
+  // son subfamilias ("001002" => familia "001", subfamilia código "002").
+  // En BD articulos.codfamilia/codsubfamilia son varchar(6): se guardan CÓDIGOS,
+  // nunca el nombre (el nombre no cabe y rompería el insert).
+  const familyOptions = useMemo(() => {
+    const map = new Map();
+    rawFamilias
+      .filter(r => r.subfamilia && r.subfamilia.trim() && r.codfamilia.length === 6)
+      .forEach(r => {
+        const fam = r.codfamilia.slice(0, 3);
+        const sub = r.codfamilia.slice(3, 6);
+        if (!map.has(fam)) {
+          map.set(fam, { codfamilia: fam, familia: r.familia, subfamilias: [] });
         }
-      }
-    });
-
-    // Convertimos el map en un array de objetos
+        if (!map.get(fam).subfamilias.some(s => s.code === sub)) {
+          map.get(fam).subfamilias.push({ code: sub, label: r.subfamilia });
+        }
+      });
+    // Incluir también familias top-level (3 dígitos) que aún no tengan subfamilias
+    rawFamilias
+      .filter(r => r.codfamilia.length === 3 && !map.has(r.codfamilia))
+      .forEach(r => {
+        map.set(r.codfamilia, { codfamilia: r.codfamilia, familia: r.familia, subfamilias: [] });
+      });
     return Array.from(map.values());
   }, [rawFamilias]);
-
-  // Este array lo usaremos para el <select> de familia
-  // Solo mostrará una opción por cada "familia" (nombre), ignorando que existan múltiples codfamilia.
-  // Cuando el usuario elija la familia, asignaremos representativeCodfamilia a nuevoArticulo.codfamilia
-  // y unimos las subfamilias en un solo array.
-  const familyOptions = useMemo(() => {
-    return groupedByFamilyName.map((item) => ({
-      familia: item.familia,
-      codfamilia: item.representativeCodfamilia,
-      subfamilias: item.subfamilias
-    }));
-  }, [groupedByFamilyName]);
 
   // Buscamos la familia seleccionada en base a 'codfamilia'
   // OJO: Aquí en el front-end estamos guardando la selección en nuevoArticulo.codfamilia
@@ -196,8 +183,8 @@ export const CreateModal = ({
           >
             <option value="">Seleccione una subfamilia</option>
             {filteredSubfamilias.map((sub) => (
-              <option key={sub} value={sub}>
-                {sub}
+              <option key={sub.code} value={sub.code}>
+                {sub.label}
               </option>
             ))}
           </select>

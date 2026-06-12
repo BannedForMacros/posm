@@ -4,9 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 use App\Models\Articulo;
-use App\Models\Familia;
 
 class ArticuloController extends Controller
 {
@@ -16,7 +15,7 @@ class ArticuloController extends Controller
             // 1) Obtener usuario
             $user = $request->user();
             if (!$user) {
-                return redirect()->route('login');
+                return response()->json(['error' => 'No autenticado'], 401);
             }
 
             // 2) Filtrar por ruc
@@ -27,21 +26,15 @@ class ArticuloController extends Controller
                 ->where('ruc', $rucUsuario)
                 ->get();
 
-            // 4) Obtener familias
-            $familias = Familia::where('ruc', $rucUsuario)->get();
-
-            // IMPORTANTE: No pongas 'return response()->json(...)' aquí,
-            // porque corta la ejecución y no llega al Inertia::render.
-
-            // 5) Retornar la vista con Inertia
-            return Inertia::render('ArticulosManage/Index', [
-                'articulos' => $articulos,
-                'familias'  => $familias,
-            ]);
+            // Este endpoint lo consumen fetch() del frontend (Articulos.jsx,
+            // Warehouse/MovementsIndex.jsx): debe devolver JSON, no una vista.
+            return response()->json($articulos);
 
         } catch (\Exception $e) {
-            // Manejo de error
-            return back()->withErrors(['error' => $e->getMessage()]);
+            return response()->json([
+                'error'   => 'Error al obtener artículos',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -55,8 +48,9 @@ class ArticuloController extends Controller
     public function show($id)
     {
         try {
-            // Llamada al procedimiento almacenado para obtener el detalle del artículo.
-            $resultado = DB::select("CALL ObtenerArticuloDetalle(?)", [$id]);
+            // Llamada al procedimiento almacenado para obtener el detalle del artículo
+            // (filtra por el ruc del usuario: los artículos son por empresa).
+            $resultado = DB::select("CALL ObtenerArticuloDetalle(?, ?)", [$id, auth()->user()->ruc]);
             if (empty($resultado)) {
                 return response()->json(['message' => 'Artículo no encontrado'], 404);
             }

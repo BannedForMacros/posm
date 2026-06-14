@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-// src/Pages/Sucursales/Index.jsx
-import React, { useState, useMemo } from 'react';
-=======
 // src/Pages/Sucursales/index.jsx
 import React, { useState, useMemo, useCallback } from 'react';
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
 import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
@@ -32,21 +27,14 @@ const SucursalesIndex = () => {
 
   const [filterText, setFilterText] = useState('');
 
-<<<<<<< HEAD
-  // Estados para modales y para editar/ver sucursales
-=======
   // Estados para los modales y para los registros a editar/ver
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [sucursalEditar, setSucursalEditar] = useState(null);
   const [sucursalVer, setSucursalVer] = useState(null);
 
-<<<<<<< HEAD
-=======
-  // Filtrado de registros según el buscador (se busca en nombre, dirección y estado formateado)
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
+  // Filtrado de registros según el buscador (nombre, dirección y estado)
   const filteredItems = useMemo(() => {
     const lowerText = filterText.toLowerCase();
     return sucursales.filter(item => {
@@ -59,10 +47,7 @@ const SucursalesIndex = () => {
     });
   }, [sucursales, filterText]);
 
-<<<<<<< HEAD
-=======
   // Definimos las columnas del DataTable
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
   const columns = [
     {
       name: 'Sucursal',
@@ -113,15 +98,8 @@ const SucursalesIndex = () => {
             variant="danger"
             size="sm"
             onClick={() => {
-<<<<<<< HEAD
-              // Obtenemos el token CSRF para eliminar
-              const token = document
-                .querySelector('meta[name="csrf-token"]')
-                .getAttribute('content');
-=======
               // Obtenemos el token CSRF del meta tag
               const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
               eliminarSucursal(row.id, token);
             }}
           />

@@ -21,18 +21,8 @@ export function useSucursales() {
         throw new Error('Error al cargar sucursales');
       }
       const data = await response.json();
-<<<<<<< HEAD
+      // El endpoint devuelve un array directo; si vino un error {error,...} usamos []
       setSucursales(Array.isArray(data) ? data : []);
-=======
-      // Verifica si "data" es un array, o si está envuelto en una propiedad "data"
-      setSucursales(
-        Array.isArray(data)
-          ? data
-          : data.data
-            ? data.data
-            : []
-      );
->>>>>>> 0534e466fbc86a6fcd308a81f78de42db62daf18
     } catch (error) {
       console.error('Error al cargar sucursales:', error);
       Swal.fire('Error', error.message, 'error');

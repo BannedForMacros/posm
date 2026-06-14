@@ -96,13 +96,20 @@ class InventarioInicialController extends Controller
     {
         $request->validate([
             'codarticulo' => 'required|integer',
-            'activo'      => 'required|integer'
+            'activo'      => 'required|integer',
+            'almacen_id'  => 'nullable|integer'
         ]);
 
-        // Ajusta si necesitas filtrar también por ruc, sucursal, etc.
-        DB::table('inventario_inicial')
-            ->where('cod_articulo', $request->codarticulo)
-            ->update(['activo' => $request->activo]);
+        // Solo se actualizan registros de la empresa del usuario autenticado
+        $query = DB::table('inventario_inicial')
+            ->where('ruc', $request->user()->ruc)
+            ->where('cod_articulo', $request->codarticulo);
+
+        if ($request->filled('almacen_id')) {
+            $query->where('almacen_id', $request->almacen_id);
+        }
+
+        $query->update(['activo' => $request->activo]);
 
         return response()->json([
             'success' => true,

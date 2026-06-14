@@ -54,11 +54,9 @@ class WarehouseDocument extends Model
         return $this->belongsTo(Facturacion::class, 'facturacion_id', 'id');
     }
 
-    // Relación con Venta (si es un documento de tipo venta/salida)
-    public function venta()
-    {
-        return $this->belongsTo(Venta::class, 'venta_id', 'id');
-    }
+    // NOTA: se eliminó la relación venta() — la FK warehouse_document.venta_id
+    // referencia a ventas_backup(id); la tabla ventas real no tiene columna id,
+    // por lo que cargar esa relación lanzaba "Column not found".
 
     // Relación con los detalles del documento de almacén
     public function detalles()

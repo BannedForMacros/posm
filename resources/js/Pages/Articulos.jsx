@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DataTable from 'react-data-table-component';
-import { Button } from '@/components/ui/Button';
-import { Inertia } from '@inertiajs/inertia';
+import { Button } from '@/Components/ui/Button';
+import { router } from '@inertiajs/react';
 import MainLayout from '@/Layouts/MainLayout';
 
 const Articulos = () => {
@@ -55,7 +55,7 @@ const Articulos = () => {
         <Button
           variant="primary"
           size="sm"
-          onClick={() => Inertia.visit(`/articulos/${row.codarticulo}`)}
+          onClick={() => router.visit(`/articulos/${row.codarticulo}`)}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

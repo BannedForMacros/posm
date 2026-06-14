@@ -12,7 +12,8 @@ export function useCompras() {
     fetch('/api/facturacion')
       .then((r) => r.json())
       .then((data) => {
-        setFacturaciones(data);
+        // Si el backend respondió con un error {error, message}, no es un array
+        setFacturaciones(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch((err) => {
@@ -63,6 +64,7 @@ export function useCompras() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
         },
         body: JSON.stringify(compraEditada),
       });
@@ -90,7 +92,13 @@ export function useCompras() {
     if (!confirm.isConfirmed) return;
 
     try {
-      const res = await fetch(`/api/facturacion/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/facturacion/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        }
+      });
       if (!res.ok) {
         const msg = await res.json();
         throw new Error(msg.message || 'Error al eliminar la compra');

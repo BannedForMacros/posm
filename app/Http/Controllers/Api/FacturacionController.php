@@ -14,15 +14,18 @@ class FacturacionController extends Controller
 public function index()
 {
     try {
-        $facturaciones = DB::table('Facturacion')
-            ->join('Proveedores', 'Facturacion.cod_proveedor', '=', 'Proveedores.id')
-            ->where('Facturacion.estado', 1)
+        $rucUsuario = auth()->user()->ruc;
+
+        $facturaciones = DB::table('facturacion')
+            ->join('proveedores', 'facturacion.cod_proveedor', '=', 'proveedores.id')
+            ->where('facturacion.estado', 1)
+            ->where('proveedores.user_ruc', $rucUsuario)
             ->select(
-                'Facturacion.*',
-                'Proveedores.razon_social as nombre_proveedor',
-                'Proveedores.ruc as ruc_proveedor' // <- Agregar esta línea
+                'facturacion.*',
+                'proveedores.razon_social as nombre_proveedor',
+                'proveedores.ruc as ruc_proveedor'
             )
-            ->orderBy('Facturacion.created_at', 'desc')
+            ->orderBy('facturacion.created_at', 'desc')
             ->get();
             
         return response()->json($facturaciones);
@@ -41,8 +44,9 @@ public function index()
         // Validaciones
         $request->validate([
             'tipo_documento'            => 'required|integer',
-            'num_serie'                 => 'required|integer',
-            'num_documento'             => 'required|integer',
+            // En BD son varchar(50): las series reales son alfanuméricas (p.ej. "F001")
+            'num_serie'                 => 'required|string|max:50',
+            'num_documento'             => 'required|string|max:50',
             'cod_proveedor'             => 'required|integer',
             'fecha'                     => 'required|date',
             'valor_compra'              => 'required|numeric',
@@ -53,9 +57,8 @@ public function index()
 
             // Campo opcional para indicar si se generará doc. de almacén
             'generar_almacen'  => 'boolean',
-            // Si deseas recibir almacen_id y operacion_id
-            // 'almacen_id'    => 'integer',
-            // 'operacion_id'  => 'integer',
+            // almacen_id es obligatorio cuando se genera documento de almacén
+            'almacen_id'       => 'required_if:generar_almacen,true|integer',
         ]);
 
         try {
@@ -89,13 +92,19 @@ public function index()
 
                 // b) Tomar el user logueado
                 $user = auth()->user();
-                // El ruc del usuario
-                $rucUsuario = $user->ruc ?? '20507661441';
+                // El ruc del usuario (obligatorio: el inventario es por empresa)
+                $rucUsuario = $user->ruc ?? null;
+                if (!$rucUsuario) {
+                    DB::rollBack();
+                    return response()->json([
+                        'error' => 'El usuario no tiene un RUC asignado; no se puede generar el documento de almacén.'
+                    ], 422);
+                }
                 // El ID del usuario (si en tu warehouse_document lo guardas)
                 $userId = $user->id ?? null;
 
-                // c) Tomar el almacen (si no llega, usar 1 por defecto)
-                $almacenId = $request->almacen_id ?? 1;
+                // c) Almacén destino (validado como requerido cuando generar_almacen=true)
+                $almacenId = $request->almacen_id;
 
                 // d) Crear la cabecera en warehouse_document
                 $wdId = DB::table('warehouse_document')->insertGetId([
@@ -169,13 +178,26 @@ public function index()
         }
     }
 
-    // GET /api/facturacion/{id}
-
+    /**
+     * Verifica que la facturación pertenezca a la empresa del usuario autenticado
+     * (la facturación se asocia al tenant a través del proveedor).
+     */
+    private function perteneceAlUsuario($id): bool
+    {
+        return DB::table('facturacion')
+            ->join('proveedores', 'facturacion.cod_proveedor', '=', 'proveedores.id')
+            ->where('facturacion.id', $id)
+            ->where('proveedores.user_ruc', auth()->user()->ruc)
+            ->exists();
+    }
 
     // GET /api/facturacion/{id}
     public function show($id)
     {
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Facturación no encontrada'], 404);
+            }
             // Obtener cabecera
             $factArr = DB::select("CALL sp_obtenerFacturacion(?)", [$id]);
             if (empty($factArr)) {
@@ -204,10 +226,15 @@ public function index()
         $request->validate([
             'fecha'        => 'required|date',
             'valor_compra' => 'required|numeric',
-            'detalles'     => 'required|array'
+            // Opcional: si no se envían detalles, solo se actualiza la cabecera
+            'detalles'     => 'sometimes|array|min:1'
         ]);
 
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Facturación no encontrada'], 404);
+            }
+
             DB::beginTransaction();
 
             // Actualizar la cabecera
@@ -217,20 +244,23 @@ public function index()
                 $request->valor_compra
             ]);
 
-            // Eliminar lógicamente los detalles anteriores
-            $detallesExist = DB::select("CALL sp_obtenerDetallesFacturacion(?)", [$id]);
-            foreach ($detallesExist as $detalle) {
-                DB::statement("CALL sp_eliminarDetalleFacturacion(?)", [$detalle->id]);
-            }
+            // Si llegan detalles, se reemplazan; si no, solo se actualizó la cabecera
+            if ($request->filled('detalles')) {
+                // Eliminar lógicamente los detalles anteriores
+                $detallesExist = DB::select("CALL sp_obtenerDetallesFacturacion(?)", [$id]);
+                foreach ($detallesExist as $detalle) {
+                    DB::statement("CALL sp_eliminarDetalleFacturacion(?)", [$detalle->id]);
+                }
 
-            // Insertar los nuevos
-            foreach ($request->detalles as $detalle) {
-                DB::statement("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
-                    $id,
-                    $detalle['cod_articulo'],
-                    $detalle['cantidad'],
-                    $detalle['precio_unitario']
-                ]);
+                // Insertar los nuevos
+                foreach ($request->detalles as $detalle) {
+                    DB::statement("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
+                        $id,
+                        $detalle['cod_articulo'],
+                        $detalle['cantidad'],
+                        $detalle['precio_unitario']
+                    ]);
+                }
             }
 
             DB::commit();
@@ -251,6 +281,9 @@ public function index()
     public function destroy($id)
     {
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Facturación no encontrada'], 404);
+            }
             // Eliminar lógicamente la cabecera
             DB::statement("CALL sp_eliminarFacturacion(?)", [$id]);
             return response()->json([

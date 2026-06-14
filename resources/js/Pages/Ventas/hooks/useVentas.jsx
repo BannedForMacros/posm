@@ -13,7 +13,8 @@ export function useVentas() {
         headers: { 'Accept': 'application/json' },
       });
       const data = await res.json();
-      setVentas(data);
+      // Si el backend respondió con un error {error, message}, no es un array
+      setVentas(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar ventas:', error);
     } finally {

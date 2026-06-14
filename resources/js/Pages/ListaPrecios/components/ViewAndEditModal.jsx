@@ -71,10 +71,13 @@ const cargarDetalle = async () => {
   // Guardar cambios
   const handleGuardarCambios = async () => {
     try {
-      // Armamos body con los precios (y si tu backend lo requiere, el nombre)
+      // El backend (sp_editarDetalleListaPrecios) identifica cada fila por
+      // cod_articulo + cod_unidad; el SP de lectura los devuelve como
+      // codarticulo / codunidad / precio_publico.
       const body = detallesFiltrados.map(d => ({
-        id: d.id,
-        precio: d.precio
+        cod_articulo: d.codarticulo,
+        cod_unidad: d.codunidad,
+        precio: parseFloat(d.precio_publico)
       }));
 
       // CSRF token (si tu Laravel lo necesita)
@@ -165,7 +168,7 @@ const cargarDetalle = async () => {
             {/* Lista de artículos */}
             <div className="border p-2 max-h-[300px] overflow-auto bg-white">
               {detallesFiltrados.map((item, idx) => (
-                <div key={item.id} className="flex items-center gap-2 mb-2">
+                <div key={`${item.codarticulo}-${item.codunidad}`} className="flex items-center gap-2 mb-2">
                   <span className="flex-1 text-sm">
                     {item.nombre_articulo || 'Artículo'}
                   </span>
@@ -176,17 +179,17 @@ const cargarDetalle = async () => {
                         type="number"
                         step="0.01"
                         className="border p-1 w-24 text-right"
-                        value={item.precio}
+                        value={item.precio_publico}
                         onChange={e => {
                           const copia = [...detallesFiltrados];
-                          copia[idx].precio = e.target.value;
+                          copia[idx] = { ...copia[idx], precio_publico: e.target.value };
                           setDetallesFiltrados(copia);
                         }}
                       />
                     </div>
                   ) : (
                     <span className="w-24 text-right">
-                      {parseFloat(item.precio).toFixed(2)}
+                      {parseFloat(item.precio_publico).toFixed(2)}
                     </span>
                   )}
                 </div>

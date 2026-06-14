@@ -47,6 +47,7 @@ class ListaPreciosController extends Controller
             'nombre' => 'required|string|max:100',
             'detalle' => 'required|array',
             'detalle.*.cod_articulo' => 'required|integer',
+            'detalle.*.cod_unidad'   => 'nullable|integer',
             'detalle.*.precio' => 'required|numeric'
         ]);
 
@@ -60,12 +61,19 @@ class ListaPreciosController extends Controller
             ]);
             // sp_crearListaPrecios retorna SELECT LAST_INSERT_ID() AS id_creado
             $lista_id = $resultLista[0]->id_creado ?? null;
+            if (!$lista_id) {
+                // Aborta la transacción: sin cabecera no se pueden insertar detalles
+                throw new \Exception('No se pudo crear la cabecera de la lista de precios.');
+            }
 
-            // 2) Crear detalle
+            // 2) Crear detalle — el SP requiere 4 parámetros:
+            //    (lista_id, cod_articulo, cod_unidad, precio).
+            //    Si el frontend no envía unidad, se usa 1 = "unidad".
             foreach ($request->detalle as $item) {
-                DB::statement("CALL sp_crearDetalleListaPrecios(?, ?, ?)", [
+                DB::statement("CALL sp_crearDetalleListaPrecios(?, ?, ?, ?)", [
                     $lista_id,
                     $item['cod_articulo'],
+                    $item['cod_unidad'] ?? 1,
                     $item['precio']
                 ]);
             }
@@ -89,8 +97,23 @@ class ListaPreciosController extends Controller
      * GET /api/listaprecios/detalle/{id}
      * Retorna el detalle de una lista (sp_obtenerDetalleListaPrecios).
      */
+    /**
+     * Verifica que la lista de precios pertenezca a la empresa del usuario autenticado.
+     */
+    private function perteneceAlUsuario($id): bool
+    {
+        return DB::table('lista_precios')
+            ->where('id', $id)
+            ->where('ruc', auth()->user()->ruc)
+            ->exists();
+    }
+
     public function showDetalle($id)
     {
+        if (!$this->perteneceAlUsuario($id)) {
+            return response()->json(['error' => 'Lista no encontrada'], 404);
+        }
+
         try {
             // Llamamos al SP para obtener el detalle de la lista
             $detalle = DB::select("CALL sp_obtenerDetalleListaPrecios(?)", [$id]);
@@ -125,17 +148,24 @@ class ListaPreciosController extends Controller
      */
     public function updateDetalle(Request $request, $id)
     {
+        // El SP identifica cada fila por (lista_id, cod_articulo, cod_unidad)
         $request->validate([
-            '*.id' => 'required|integer',
-            '*.precio' => 'required|numeric'
+            '*.cod_articulo' => 'required|integer',
+            '*.cod_unidad'   => 'required|integer',
+            '*.precio'       => 'required|numeric'
         ]);
+
+        if (!$this->perteneceAlUsuario($id)) {
+            return response()->json(['error' => 'Lista no encontrada'], 404);
+        }
 
         try {
             DB::beginTransaction();
-            // Ejemplo: iterar y llamar sp_editarDetalleListaPrecios
             foreach ($request->all() as $item) {
-                DB::statement("CALL sp_editarDetalleListaPrecios(?, ?)", [
-                    $item['id'],
+                DB::statement("CALL sp_editarDetalleListaPrecios(?, ?, ?, ?)", [
+                    $id,
+                    $item['cod_articulo'],
+                    $item['cod_unidad'],
                     $item['precio']
                 ]);
             }
@@ -159,6 +189,10 @@ class ListaPreciosController extends Controller
      */
     public function desactivar($id)
     {
+        if (!$this->perteneceAlUsuario($id)) {
+            return response()->json(['error' => 'Lista no encontrada'], 404);
+        }
+
         try {
             DB::statement("CALL sp_desactivarListaPrecios(?)", [$id]);
             return response()->json([

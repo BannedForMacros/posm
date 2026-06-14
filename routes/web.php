@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -53,9 +54,6 @@ Route::prefix('api/dashboard')->group(function () {
          ->name('api.dashboard.graficos');
 });
 
-Route::get('/subfamilias', [ArticuloController::class, 'subfamilias']);
-
-    
 // *********************************************************************
     // SECCIÓN CORREGIDA: Warehouse Documents dentro del grupo de autenticación
     // *********************************************************************
@@ -78,12 +76,6 @@ Route::get('/subfamilias', [ArticuloController::class, 'subfamilias']);
         Route::prefix('warehouse-documents')->group(function() {
             Route::get('/', [WarehouseDocumentController::class, 'index']);
             Route::get('/{id}', [WarehouseDocumentController::class, 'show']);
-        });
-        // Rutas warehouse-document-details
-        Route::prefix('warehouse-document-details')->group(function() {
-            Route::get('/', [WarehouseDocumentDetailController::class, 'index']);
-            Route::get('/{id}', [WarehouseDocumentDetailController::class, 'show']);
-            Route::get('/movimientos-por-producto', [WarehouseDocumentDetailController::class, 'movimientosPorProducto']);
         });
         // RUTA /api/warehouse-movements
         Route::get('/warehouse-movements', [WarehouseDocumentDetailController::class, 'movementsIndex']);
@@ -319,17 +311,6 @@ Route::prefix('api/ventas')->group(function () {
     // Crear nueva venta (POST /api/ventas)
     Route::post('/', [VentasController::class, 'store'])
          ->name('api.ventas.store');
-             // Actualizar una venta (PUT /api/ventas/{id})
-
-
-
-    // Actualizar una venta (PUT /api/ventas/{id})
-    Route::put('/{id}', [VentasController::class, 'update'])
-         ->name('api.ventas.update');
-
-    // Eliminar (lógicamente) una venta (DELETE /api/ventas/{id})
-    Route::delete('/{id}', [VentasController::class, 'destroy'])
-         ->name('api.ventas.destroy');
 
     // Rutas para detalles y formas de pago (si las mantienes):
     Route::get('/detalles/{cod_documento}/{seri_venta}/{nume_venta}',
@@ -340,22 +321,7 @@ Route::prefix('api/ventas')->group(function () {
         [VentasController::class, 'showPaymentMethods']
     )->name('api.ventas.formas_pago');
 
-    // Si manejas estadísticas, gráficas, etc.
-    Route::get('/grafica-ventas-por-dia', [VentasController::class, 'graficaVentasPorDia'])
-         ->name('api.ventas.grafica_por_dia');
-    Route::get('/grafica-ventas-por-formapago', [VentasController::class, 'graficaVentasPorFormaPago'])
-         ->name('api.ventas.grafica_por_formapago');
-    Route::get('/grafica-ventas-por-articulo', [VentasController::class, 'graficaVentasPorArticulo'])
-         ->name('api.ventas.grafica_por_articulo');
-    Route::get('/grafica-top-articulos', [VentasController::class, 'graficaTopArticulos'])
-         ->name('api.ventas.grafica_top_articulos');
-
-    Route::get('/estadisticas-generales', [VentasController::class, 'estadisticasGenerales'])
-         ->name('api.ventas.estadisticas_generales');
-
-    Route::get('/detalle-completo/{cod_documento}/{seri_venta}/{nume_venta}',
-        [VentasController::class, 'getDetalleCompleto']
-    )->name('api.ventas.detalle_completo');
+    // Las gráficas y estadísticas viven en DashboardController (api/dashboard/graficos).
 });
 
      /**
@@ -374,24 +340,24 @@ Route::prefix('api/ventas')->group(function () {
         Route::put('/{id}', [ProveedoresController::class, 'update']);
         Route::delete('/{id}', [ProveedoresController::class, 'destroy']);
     });
-});
 
-/**
- * ARTÍCULOS (Rutas públicas: si las mantienes)
- */
-Route::get('/articulos', function () {
-    return Inertia::render('Articulos');
-})->name('articulos');
+    /**
+     * ARTÍCULOS — requieren sesión: los datos son por empresa (ruc)
+     */
+    Route::get('/articulos', function () {
+        return Inertia::render('Articulos');
+    })->name('articulos');
 
-Route::get('/articulos/{id}', function ($id) {
-    return Inertia::render('ArticuloDetalle', ['id' => $id]);
-})->name('articulos.detalle');
+    Route::get('/articulos/{id}', function ($id) {
+        return Inertia::render('ArticuloDetalle', ['id' => $id]);
+    })->name('articulos.detalle');
 
-Route::prefix('api/articulos')->group(function () {
-    Route::get('/', [ArticuloController::class, 'index'])
-        ->name('api.articulos');
-    Route::get('/{id}', [ArticuloController::class, 'show'])
-        ->name('api.articulos.show');
+    Route::prefix('api/articulos')->group(function () {
+        Route::get('/', [ArticuloController::class, 'index'])
+            ->name('api.articulos');
+        Route::get('/{id}', [ArticuloController::class, 'show'])
+            ->name('api.articulos.show');
+    });
 });
 
 

@@ -54,56 +54,202 @@ class VentasController extends Controller
      */
 
 
+     // Tasa de IGV (Perú). Los precios unitarios que ingresa el cajero
+     // se interpretan como precio CON IGV incluido (boleta/factura).
+     private const TASA_IGV = 18.0;
+
      public function store(Request $request)
      {
          $request->validate([
+             'cod_documento'        => 'required|string|max:2',
+             'seri_venta'           => 'required|string|max:20',
+             // Si no se envía, se autogenera el siguiente correlativo de la serie
+             'nume_venta'           => 'nullable|string|max:20',
              'almacen_id'           => 'required|integer',
              'fecha'                => 'required|date',
-             // En este ejemplo, operacion_id lo fijamos en 2, 
-             // o lo tomamos del request si quieres personalizar
-             // 'operacion_id'         => 'required|integer',
-     
-             // Facturación o venta (por si fuera nulo)
-             'facturacion_id'       => 'nullable|integer',
-             'venta_id'             => 'nullable|integer',
-     
+
+             // Datos del cliente (manuales en este formulario)
+             'cliente_nombre'       => 'required|string|max:150',
+             'cliente_documento'    => 'nullable|string|max:150',
+
              // Detalles
-             'detalles'                         => 'required|array',
+             'detalles'                         => 'required|array|min:1',
              'detalles.*.cod_articulo'          => 'required|integer',
-             'detalles.*.cantidad'              => 'required|numeric',
-             'detalles.*.precio_unitario'       => 'required|numeric',
+             'detalles.*.cantidad'              => 'required|numeric|gt:0',
+             'detalles.*.precio_unitario'       => 'required|numeric|gte:0',
          ]);
-     
+
          // Usuario actual
          $user = $request->user();
          if (!$user) {
              return response()->json(['error' => 'Usuario no autenticado'], 401);
          }
-     
+
          // Asignamos su RUC
-         $rucUsuario = $user->ruc;  // <-- de aquí lo sacamos
-     
+         $rucUsuario = $user->ruc;
+         if (!$rucUsuario) {
+             return response()->json([
+                 'error' => 'El usuario no tiene un RUC asignado; no se puede registrar la venta.'
+             ], 422);
+         }
+
+         $codDocumento = $request->cod_documento;
+         $seriVenta    = $request->seri_venta;
+         // Fecha de emisión en formato Y-m-d (el dashboard la parsea con STR_TO_DATE)
+         $femiVenta    = Carbon::parse($request->fecha)->format('Y-m-d');
+
          DB::beginTransaction();
          try {
-             // 1) Crear la cabecera en warehouse_document
+             // 0) Validar stock disponible ANTES de registrar la salida:
+             //    antes se truncaba a 0 en silencio y el inventario quedaba
+             //    descuadrado respecto al documento de almacén.
+             $sinStock = [];
+             foreach ($request->detalles as $det) {
+                 $invent = DB::table('inventario')
+                     ->where('ruc', $rucUsuario)
+                     ->where('almacen_id', $request->almacen_id)
+                     ->where('cod_articulo', $det['cod_articulo'])
+                     ->first();
+
+                 $disponible = $invent->stock ?? 0;
+                 if ($disponible < $det['cantidad']) {
+                     $sinStock[] = [
+                         'cod_articulo' => $det['cod_articulo'],
+                         'solicitado'   => $det['cantidad'],
+                         'disponible'   => $disponible,
+                     ];
+                 }
+             }
+
+             if (!empty($sinStock)) {
+                 DB::rollBack();
+                 return response()->json([
+                     'error'    => 'Stock insuficiente para uno o más artículos',
+                     'detalles' => $sinStock,
+                 ], 422);
+             }
+
+             // 1) Determinar el correlativo (NUME_VENTA).
+             //    Si el cajero lo escribió, se valida que no exista ya;
+             //    si lo dejó vacío, se autogenera el siguiente de la serie.
+             if ($request->filled('nume_venta')) {
+                 $numeVenta = $request->nume_venta;
+                 $yaExiste = DB::table('ventas')
+                     ->where('RUCEMPRESA', $rucUsuario)
+                     ->where('COD_DOCUMENTO', $codDocumento)
+                     ->where('SERI_VENTA', $seriVenta)
+                     ->where('NUME_VENTA', $numeVenta)
+                     ->exists();
+                 if ($yaExiste) {
+                     DB::rollBack();
+                     return response()->json([
+                         'error' => "Ya existe una venta {$codDocumento}-{$seriVenta}-{$numeVenta}."
+                     ], 422);
+                 }
+             } else {
+                 $ultimo = DB::table('ventas')
+                     ->where('RUCEMPRESA', $rucUsuario)
+                     ->where('COD_DOCUMENTO', $codDocumento)
+                     ->where('SERI_VENTA', $seriVenta)
+                     ->max(DB::raw('CAST(NUME_VENTA AS UNSIGNED)'));
+                 $numeVenta = str_pad(((int) $ultimo) + 1, 8, '0', STR_PAD_LEFT);
+             }
+
+             // 2) Calcular totales de la venta (IGV incluido en el precio unitario)
+             $factor      = 1 + (self::TASA_IGV / 100);
+             $totalVenta  = 0.0;  // total con IGV
+             $netoVenta   = 0.0;  // valor de venta sin IGV
+             $igvVenta    = 0.0;  // IGV total
+             $lineas      = [];
+
+             foreach ($request->detalles as $i => $det) {
+                 $cantidad   = (float) $det['cantidad'];
+                 $precioUnit = (float) $det['precio_unitario']; // con IGV
+                 $totalLinea = round($cantidad * $precioUnit, 2);
+                 $netoUnit   = round($precioUnit / $factor, 4);   // neto unitario
+                 $netoLinea  = round($netoUnit * $cantidad, 4);
+                 $igvLinea   = round($totalLinea - $netoLinea, 4);
+
+                 $totalVenta += $totalLinea;
+                 $netoVenta  += $netoLinea;
+                 $igvVenta   += $igvLinea;
+
+                 $lineas[] = [
+                     'idx'         => $i + 1,
+                     'cod'         => $det['cod_articulo'],
+                     'cantidad'    => $cantidad,
+                     'precio_unit' => $precioUnit,
+                     'neto_unit'   => $netoUnit,
+                     'igv_linea'   => $igvLinea,
+                     'total_linea' => $totalLinea,
+                 ];
+             }
+
+             // 3) Inferir el tipo de documento del cliente por longitud
+             $docCli = trim((string) $request->cliente_documento);
+             $tipoDocCli = strlen($docCli) === 11 ? 'RUC'
+                         : (strlen($docCli) === 8 ? 'DNI' : '');
+
+             // 4) Insertar la cabecera en `ventas`
+             DB::table('ventas')->insert([
+                 'COD_DOCUMENTO'      => $codDocumento,
+                 'SERI_VENTA'         => $seriVenta,
+                 'NUME_VENTA'         => $numeVenta,
+                 'RUCEMPRESA'         => $rucUsuario,
+                 'FEMI_VENTA'         => $femiVenta,
+                 'TNETO_VENTA'        => round($netoVenta, 2),
+                 'TDES_VENTA'         => 0,
+                 'IMPU_VENTA'         => round($igvVenta, 2),
+                 'TOTAL_VENTA'        => round($totalVenta, 2),
+                 'TCAMB_VENTA'        => 1,
+                 'ESTA_VENTA'         => 1,
+                 'fec_crea'           => now(),
+                 'CREA_USUARIO'       => $user->name,
+                 'TIPODOCUMENTOCLI'   => $tipoDocCli,
+                 'NUMERODOCUMENTOCLI' => $docCli,
+                 'RAZONSOCIALCLI'     => $request->cliente_nombre,
+                 'CODALMACEN'         => (string) $request->almacen_id,
+             ]);
+
+             // 5) Insertar los detalles en `ventasdetalle`
+             foreach ($lineas as $linea) {
+                 DB::table('ventasdetalle')->insert([
+                     'COD_DOCUMENTO'  => $codDocumento,
+                     'SERI_VENTA'     => $seriVenta,
+                     'NUME_VENTA'     => $numeVenta,
+                     'ID_VENTASD'     => $linea['idx'],
+                     'COD_ARTICULO'   => $linea['cod'],
+                     'COD_UNIDADM'    => 1, // unidad por defecto
+                     'CANT_VENTASD'   => $linea['cantidad'],
+                     'PUNI_VENTASD'   => $linea['precio_unit'],
+                     'IMPU_VENTASD'   => $linea['igv_linea'],
+                     'TNETO_VENTASD'  => $linea['neto_unit'],
+                     'TDESC_VENTASD'  => 0,
+                     'TIMP_VENTASD'   => $linea['total_linea'],
+                     'ESTA_VENTASD'   => '1',
+                     'TIP_IGV'        => 1,
+                     'TASA_IMP'       => self::TASA_IGV,
+                     'FEC_CREA'       => now(),
+                     'CREA_USUARIO'   => $user->name,
+                 ]);
+             }
+
+             // 6) Crear la cabecera del documento de almacén (movimiento de salida)
              $warehouseDoc = new WarehouseDocument();
-             // USAR RUC DEL USUARIO, no del request
-             $warehouseDoc->ruc             = $rucUsuario;  
+             $warehouseDoc->ruc             = $rucUsuario;
              $warehouseDoc->almacen_id      = $request->almacen_id;
-             $warehouseDoc->facturacion_id  = $request->facturacion_id ?? null;
-             $warehouseDoc->venta_id        = $request->venta_id ?? null;
+             $warehouseDoc->facturacion_id  = null;
+             $warehouseDoc->venta_id        = null; // ventas no tiene PK simple `id`
              $warehouseDoc->user_id         = $user->id;
-             // Podrías fijar la operación en 2 = "Venta" si así lo definiste
-             $warehouseDoc->operacion_id    = 2; 
-             // Tipo de movimiento "SALIDA" para ventas
+             $warehouseDoc->operacion_id    = 2; // 2 = Venta
              $warehouseDoc->tipo_movimiento = 'SALIDA';
              $warehouseDoc->fecha           = $request->fecha;
              $warehouseDoc->estado          = 1;
              $warehouseDoc->created_at      = now();
              $warehouseDoc->updated_at      = now();
              $warehouseDoc->save();
-     
-             // 2) Insertar detalles en warehouse_document_detail
+
+             // 7) Detalles del documento de almacén + descuento de inventario
              foreach ($request->detalles as $det) {
                  $newDetail = new WarehouseDocumentDetail();
                  $newDetail->warehouse_document_id = $warehouseDoc->id;
@@ -114,50 +260,39 @@ class VentasController extends Controller
                  $newDetail->created_at           = now();
                  $newDetail->updated_at           = now();
                  $newDetail->save();
+
+                 // Restar stock (ya validado arriba que existe y alcanza)
+                 $invent = DB::table('inventario')
+                     ->where('ruc', $rucUsuario)
+                     ->where('almacen_id', $request->almacen_id)
+                     ->where('cod_articulo', $det['cod_articulo'])
+                     ->first();
+
+                 DB::table('inventario')
+                     ->where('id', $invent->id)
+                     ->update([
+                         'stock'      => $invent->stock - $det['cantidad'],
+                         'updated_at' => now()
+                     ]);
              }
-     
-             // 3) Actualizar inventario
-             if ($warehouseDoc->tipo_movimiento === 'SALIDA') {
-                 // restamos stock
-                 foreach ($request->detalles as $det) {
-                     $invent = DB::table('inventario')
-                         ->where('ruc', $rucUsuario)
-                         ->where('almacen_id', $request->almacen_id)
-                         ->where('cod_articulo', $det['cod_articulo'])
-                         ->first();
-     
-                     if ($invent) {
-                         // restar
-                         $nuevoStock = max(0, $invent->stock - $det['cantidad']);
-                         DB::table('inventario')
-                             ->where('id', $invent->id)
-                             ->update([
-                                 'stock'      => $nuevoStock,
-                                 'updated_at' => now()
-                             ]);
-                     } else {
-                         // Si no existía, puedes manejarlo como quieras:
-                         // - Error: "No hay stock" 
-                         // - O interpretarlo como stock=0 y se pone en negativo
-                         //   si permites sobregiro, etc.
-                     }
-                 }
-             } elseif ($warehouseDoc->tipo_movimiento === 'INGRESO') {
-                 // sumar stock (por si en algún caso es una venta que ingresa algo)
-                 // ... 
-             }
-     
+
              DB::commit();
              return response()->json([
                  'success' => true,
-                 'message' => 'Documento de almacén (Venta) creado correctamente',
+                 'message' => "Venta {$codDocumento}-{$seriVenta}-{$numeVenta} registrada correctamente",
+                 'venta'   => [
+                     'cod_documento' => $codDocumento,
+                     'seri_venta'    => $seriVenta,
+                     'nume_venta'    => $numeVenta,
+                     'total_venta'   => round($totalVenta, 2),
+                 ],
                  'warehouse_document_id' => $warehouseDoc->id
              ], 201);
      
          } catch (\Exception $e) {
              DB::rollBack();
              return response()->json([
-                 'error'   => 'Error al crear documento de almacén (Venta)',
+                 'error'   => 'Error al registrar la venta',
                  'message' => $e->getMessage()
              ], 500);
          }
@@ -167,8 +302,10 @@ class VentasController extends Controller
     {
         try {
             // Llamar al procedimiento almacenado para obtener detalles de la venta
-            $detalles = DB::select("CALL ObtenerDetallesVenta(?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta
+            // (incluye el ruc: la PK de ventas es compuesta y la misma serie/número
+            // puede existir en otra empresa).
+            $detalles = DB::select("CALL ObtenerDetallesVenta(?, ?, ?, ?)", [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($detalles);
         } catch (\Exception $e) {
@@ -193,8 +330,9 @@ class VentasController extends Controller
     {
         try {
             // Llamar al procedimiento almacenado para obtener formas de pago
-            $formasPago = DB::select("CALL ObtenerFormasPagoVenta(?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta
+            // (incluye el ruc para no mezclar ventas de otra empresa)
+            $formasPago = DB::select("CALL ObtenerFormasPagoVenta(?, ?, ?, ?)", [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($formasPago);
         } catch (\Exception $e) {

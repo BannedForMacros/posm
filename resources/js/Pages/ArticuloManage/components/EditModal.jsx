@@ -27,34 +27,37 @@ export const EditModal = ({
     }
   }, [isOpen, familiasProp]);
 
-  const groupedByFamilyName = useMemo(() => {
+  // Misma agrupación que CreateModal: las filas con codfamilia de 6 dígitos
+  // son subfamilias ("001002" => familia "001", subfamilia código "002").
+  // El backend espera codsubfamilia como CÓDIGO (varchar(6)), no el nombre.
+  const familyOptions = useMemo(() => {
     const map = new Map();
-    rawFamilias.forEach(({ codfamilia, familia, subfamilia }) => {
-      if (!map.has(familia)) {
-        map.set(familia, {
-          familia,
-          representativeCodfamilia: codfamilia,
-          subfamilias: []
-        });
-      }
-      if (subfamilia && !map.get(familia).subfamilias.includes(subfamilia)) {
-        map.get(familia).subfamilias.push(subfamilia);
-      }
-    });
+    rawFamilias
+      .filter(r => r.subfamilia && r.subfamilia.trim() && r.codfamilia.length === 6)
+      .forEach(r => {
+        const fam = r.codfamilia.slice(0, 3);
+        const sub = r.codfamilia.slice(3, 6);
+        if (!map.has(fam)) {
+          map.set(fam, { codfamilia: fam, familia: r.familia, subfamilias: [] });
+        }
+        if (!map.get(fam).subfamilias.some(s => s.code === sub)) {
+          map.get(fam).subfamilias.push({ code: sub, label: r.subfamilia });
+        }
+      });
+    // Incluir también familias top-level (3 dígitos) que aún no tengan subfamilias
+    rawFamilias
+      .filter(r => r.codfamilia.length === 3 && !map.has(r.codfamilia))
+      .forEach(r => {
+        map.set(r.codfamilia, { codfamilia: r.codfamilia, familia: r.familia, subfamilias: [] });
+      });
     return Array.from(map.values());
   }, [rawFamilias]);
-
-  const familyOptions = useMemo(() => groupedByFamilyName.map(item => ({
-    familia: item.familia,
-    codfamilia: item.representativeCodfamilia,
-    subfamilias: item.subfamilias
-  })), [groupedByFamilyName]);
 
   const selectedFamily = useMemo(() => {
     if (!articulo) return null;
     return familyOptions.find(opt => opt.codfamilia === articulo.codfamilia);
   }, [familyOptions, articulo]);
-  
+
 
   const filteredSubfamilias = selectedFamily ? selectedFamily.subfamilias : [];
 
@@ -118,7 +121,7 @@ export const EditModal = ({
             >
               <option value="">Seleccione una subfamilia</option>
               {filteredSubfamilias.map((sub) => (
-                <option key={sub} value={sub}>{sub}</option>
+                <option key={sub.code} value={sub.code}>{sub.label}</option>
               ))}
             </select>
           </label>

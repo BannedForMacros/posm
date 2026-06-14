@@ -3,7 +3,7 @@ import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
 import { Eye, Search } from 'lucide-react';
-import { Input } from '@/Components/ui/input'; // Ajusta si tu input está en otra ruta
+import { Input } from '@/Components/ui/Input'; // Ajusta si tu input está en otra ruta
 
 import { useWarehouseDocuments } from './hooks/useWarehouseDocuments';
 import { customStyles } from './styles/tableStyles'; // Si usas estilos personalizados

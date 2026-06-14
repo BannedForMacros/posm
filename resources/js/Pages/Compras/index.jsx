@@ -11,7 +11,7 @@ import EditModal from './components/EditModal';
 import ViewModal from './components/ViewModal';
 
 export default function Index() {
-  const { facturaciones, loading, eliminarCompra, loadFacturaciones } = useCompras();
+  const { facturaciones, loading, editarCompra, eliminarCompra, loadFacturaciones } = useCompras();
 
   // Control de modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -228,6 +228,7 @@ export default function Index() {
           isOpen={isEditOpen}
           onClose={() => setIsEditOpen(false)}
           compra={compraEditar}
+          editarCompraFn={editarCompra}
         />
 
         {/* Modal Ver */}

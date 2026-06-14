@@ -16,6 +16,7 @@ class WarehouseDocumentController extends Controller
             Log::info('Iniciando obtención de documentos de almacén con relaciones operacion y user');
             
             $warehouseDocuments = WarehouseDocument::with(['operacion', 'user'])
+                ->where('ruc', auth()->user()->ruc)
                 ->orderBy('fecha', 'desc')
                 ->get();
             
@@ -40,14 +41,16 @@ public function show($id)
     try {
         // Usamos Eloquent con las relaciones:
         // 'almacen', 'user', 'operacion', 'facturacion', 'venta', y 'detalles.articulo'
+        // NOTA: no se carga 'venta' — la FK warehouse_document.venta_id apunta a
+        // ventas_backup(id) y la tabla ventas real no tiene columna id, por lo
+        // que cargar esa relación lanza "Column not found" cuando venta_id != null.
         $doc = \App\Models\WarehouseDocument::with([
             'almacen',
             'user',
             'operacion',
             'facturacion',
-            'venta',            // si tienes la relación "public function venta() { ... }" en el modelo
             'detalles.articulo' // para mostrar el nombre del artículo
-        ])->findOrFail($id);
+        ])->where('ruc', auth()->user()->ruc)->findOrFail($id);
 
         return response()->json($doc);
     } catch (\Exception $e) {

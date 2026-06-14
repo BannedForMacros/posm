@@ -8,9 +8,10 @@ class InventarioInicial extends Model
 {
     protected $table = 'inventario_inicial';
 
+    // NOTA: la tabla inventario_inicial NO tiene columna sucursal_id;
+    // incluirla en fillable provocaría "Column not found" en mass-assignment.
     protected $fillable = [
         'ruc',
-        'sucursal_id',
         'almacen_id',
         'cod_articulo',
         'stock_inicial',

@@ -9,10 +9,12 @@ class Venta extends Model
     // Nombre real de la tabla en tu BD
     protected $table = 'ventas';
 
-    // La PK es 'id' (auto-increment)
-    protected $primaryKey = 'id';
-    public $incrementing = true;   // Indicamos que es auto-increment
-    protected $keyType = 'int';    // o 'bigint', según tu definición
+    // OJO: la tabla ventas NO tiene columna `id`. Su clave primaria es
+    // compuesta: (COD_DOCUMENTO, SERI_VENTA, NUME_VENTA, RUCEMPRESA).
+    // Eloquent no soporta PK compuestas, así que este modelo solo debe
+    // usarse para consultas con where(), nunca find()/save() por PK.
+    protected $primaryKey = null;
+    public $incrementing = false;
 
     // Si no manejas created_at y updated_at de forma automática
     public $timestamps = false;
@@ -33,18 +35,14 @@ class Venta extends Model
         'IMPU_VENTA',
         'TOTAL_VENTA',
         'RUCEMPRESA',
-        'sucursal_id',
-        'almacen_id',
-        // etc. (agrega las que necesites)
+        // Las columnas reales de sucursal/almacén en ventas son
+        // CODIGOSUCURSAL y CODALMACEN (no existen sucursal_id/almacen_id).
+        'CODIGOSUCURSAL',
+        'CODALMACEN',
     ];
 
-    /**
-     * Relación con el detalle (ventasdetalle).
-     * Indica que una venta tiene muchos detalles.
-     */
-    public function detalles()
-    {
-        // hasMany(<ModeloDetalle>, <clave_foranea_en_detalle>, <clave_pk_en_esta_tabla>)
-        return $this->hasMany(VentasDetalle::class, 'venta_id', 'id');
-    }
+    // NOTA: no hay relación detalles() — ventasdetalle no tiene columna
+    // venta_id; el vínculo real es por (COD_DOCUMENTO, SERI_VENTA, NUME_VENTA),
+    // que Eloquent no soporta como FK compuesta. Los detalles se obtienen
+    // vía SP ObtenerDetallesVenta.
 }

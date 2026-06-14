@@ -91,6 +91,17 @@ class SucursalesController extends Controller
      * Actualizar sucursal.
      * PUT /api/sucursales/{id}
      */
+    /**
+     * Verifica que la sucursal pertenezca a la empresa del usuario autenticado.
+     */
+    private function perteneceAlUsuario($id): bool
+    {
+        return DB::table('sucursal')
+            ->where('id', $id)
+            ->where('user_ruc', auth()->user()->ruc)
+            ->exists();
+    }
+
     public function update(Request $request, $id)
     {
         $request->validate([
@@ -99,6 +110,9 @@ class SucursalesController extends Controller
         ]);
 
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Sucursal no encontrada'], 404);
+            }
             DB::statement("CALL usp_sucursales_update(?, ?, ?)", [
                 $id,
                 $request->nombre,
@@ -123,6 +137,9 @@ class SucursalesController extends Controller
     public function destroy($id)
     {
         try {
+            if (!$this->perteneceAlUsuario($id)) {
+                return response()->json(['error' => 'Sucursal no encontrada'], 404);
+            }
             DB::statement("CALL usp_sucursales_delete(?)", [$id]);
             return response()->json([
                 'success' => true,

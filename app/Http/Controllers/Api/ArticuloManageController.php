@@ -46,15 +46,19 @@ class ArticuloManageController extends Controller
         $ruc  = $user->ruc ?? null;
 
         $request->validate([
-            'codarticulo'    => 'required|integer|unique:articulos,codarticulo',
-            'codfamilia'     => 'required|string|max:6',
+            // Opcional: si no se envía, se autogenera el siguiente código disponible
+            'codarticulo'    => 'nullable|integer|unique:articulos,codarticulo',
+            'codfamilia'     => 'nullable|string|max:6',
             'nombrearticulo' => 'required|string|max:200',
             // En BD codsubfamilia es varchar(6): debe ser el CÓDIGO, no el nombre
-            'codsubfamilia'  => 'required|string|max:6',
+            'codsubfamilia'  => 'nullable|string|max:6',
         ]);
 
         $articulo = new Articulo();
-        $articulo->codarticulo    = $request->codarticulo;
+        // codarticulo es PK global: si no lo envían, tomamos el siguiente correlativo.
+        $articulo->codarticulo    = $request->filled('codarticulo')
+            ? (int) $request->codarticulo
+            : ((int) Articulo::max('codarticulo') + 1);
         $articulo->codfamilia     = $request->codfamilia;
         $articulo->ruc            = $ruc;  // Asigna el RUC
         $articulo->codsubfamilia  = $request->codsubfamilia ?? null;

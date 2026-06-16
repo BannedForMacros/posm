@@ -171,6 +171,20 @@ public function index()
                 'message' => 'Facturación creada correctamente',
                 'id'      => $facturacion_id
             ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            DB::rollBack();
+            // 23505 = unique_violation (Postgres): la restricción uq_facturacion
+            // (tipo_documento + num_serie + num_documento + cod_proveedor) ya existe.
+            if ($e->getCode() === '23505') {
+                return response()->json([
+                    'error'   => true,
+                    'message' => 'Ya existe una compra con ese tipo de documento, serie y número para este proveedor.'
+                ], 422);
+            }
+            return response()->json([
+                'error'   => 'Error al crear la facturación',
+                'message' => $e->getMessage()
+            ], 500);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([

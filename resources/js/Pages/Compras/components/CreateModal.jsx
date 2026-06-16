@@ -12,7 +12,7 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
   const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
   // ======== ESTADOS PRINCIPALES =========
-  const [nuevaCompra, setNuevaCompra] = useState({
+  const estadoInicialCompra = {
     tipo_documento: '',
     fecha: '',
     num_serie: '',         // seguirá siendo string, ahora en el input será text
@@ -21,7 +21,9 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     nombre_proveedor: '',
     valor_compra: '0.00',
     detalles: [],
-  });
+  };
+
+  const [nuevaCompra, setNuevaCompra] = useState(estadoInicialCompra);
 
   const [almacenId, setAlmacenId] = useState('');
   const [almacenes, setAlmacenes] = useState([]);
@@ -37,9 +39,13 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
   // Referencias para hacer focus en la cantidad
   const cantidadRefs = useRef([]);
 
-  // Cargar almacenes y tipos de documento al abrir
+  // Cargar almacenes y tipos de documento al abrir, y reiniciar el formulario
+  // (el modal queda montado, así que sin esto conservaría los datos de la compra anterior).
   useEffect(() => {
     if (isOpen) {
+      setNuevaCompra(estadoInicialCompra);
+      setAlmacenId('');
+      setDetalleIndexEnEdicion(null);
       cargarAlmacenes();
       cargarTipoDocumentos();
     }

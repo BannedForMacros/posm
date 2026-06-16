@@ -114,27 +114,56 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     setIsProveedorModalOpen(false);
   };
 
-  // Buscar Artículo
+  // Agregar producto: abre el buscador y la selección crea (o reutiliza) una fila
+  const handleAgregarProducto = () => {
+    setDetalleIndexEnEdicion(null);   // null = "es un producto nuevo"
+    setIsArticuloModalOpen(true);
+  };
+  // Cambiar el artículo de una fila existente
   const handleSearchArticulo = (index) => {
     setDetalleIndexEnEdicion(index);
     setIsArticuloModalOpen(true);
   };
   const handleSelectArticulo = (art) => {
+    let focusIdx;
     setNuevaCompra(prev => {
       const copia = [...prev.detalles];
-      copia[detalleIndexEnEdicion] = {
-        ...copia[detalleIndexEnEdicion],
-        cod_articulo: art.codarticulo,
-        nombre_articulo: art.nombrearticulo || art.nombrecorto,
-      };
+      if (detalleIndexEnEdicion === null) {
+        // Producto nuevo: si ya existe en la lista, sumamos 1 a su cantidad en vez de duplicar
+        const existente = copia.findIndex(
+          d => String(d.cod_articulo) === String(art.codarticulo)
+        );
+        if (existente >= 0) {
+          const cant = parseFloat(copia[existente].cantidad) || 0;
+          copia[existente] = { ...copia[existente], cantidad: String(cant + 1) };
+          focusIdx = existente;
+        } else {
+          copia.push({
+            cod_articulo: art.codarticulo,
+            nombre_articulo: art.nombrearticulo || art.nombrecorto,
+            cantidad: '1',
+            precio_unitario: '',
+          });
+          focusIdx = copia.length - 1;
+        }
+      } else {
+        // Reemplazar el artículo de una fila existente
+        copia[detalleIndexEnEdicion] = {
+          ...copia[detalleIndexEnEdicion],
+          cod_articulo: art.codarticulo,
+          nombre_articulo: art.nombrearticulo || art.nombrecorto,
+        };
+        focusIdx = detalleIndexEnEdicion;
+      }
       return { ...prev, detalles: copia };
     });
     setIsArticuloModalOpen(false);
 
-    // Focus en cantidad
+    // Focus en la cantidad de la fila afectada
     setTimeout(() => {
-      if (cantidadRefs.current[detalleIndexEnEdicion]) {
-        cantidadRefs.current[detalleIndexEnEdicion].focus();
+      if (focusIdx != null && cantidadRefs.current[focusIdx]) {
+        cantidadRefs.current[focusIdx].focus();
+        cantidadRefs.current[focusIdx].select?.();
       }
     }, 100);
   };
@@ -209,13 +238,13 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
     <ModalGrande isOpen={isOpen} onClose={onClose} title="Crear Nueva Compra">
       <div className="w-full mx-auto space-y-6 p-4">
         
-        {/* Contenedor en 2 columnas */}
+        {/* Contenedor en 2 columnas (responsive: apila en pantallas pequeñas) */}
         <div className="flex flex-col lg:flex-row gap-6">
-          
+
           {/* Columna Izquierda (campos) */}
-          <div className="w-full lg:w-1/3 space-y-4 min-w-[400px]">
+          <div className="w-full lg:w-1/3 space-y-4">
             {/* TipoDocumento + Fecha */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-sm font-semibold">Tipo de Documento:</span>
                 <select
@@ -246,12 +275,13 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
             </div>
 
             {/* N° Serie + N° Documento */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-sm font-semibold">N° Serie:</span>
                 <input
                   type="text"
-                  className="mt-1 block w-full border p-2"
+                  className="mt-1 block w-full border rounded p-2"
+                  placeholder="Ej. F001"
                   value={nuevaCompra.num_serie}
                   onChange={(e) =>
                     setNuevaCompra({ ...nuevaCompra, num_serie: e.target.value })
@@ -261,9 +291,13 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
 
               <label className="block">
                 <span className="text-sm font-semibold">N° Documento:</span>
+                {/* type=text: la columna es varchar(50); con number se perdían los ceros
+                    a la izquierda (0001 -> 1) y no aceptaba series alfanuméricas */}
                 <input
-                  type="number"
-                  className="mt-1 block w-full border p-2"
+                  type="text"
+                  inputMode="numeric"
+                  className="mt-1 block w-full border rounded p-2"
+                  placeholder="Ej. 0001"
                   value={nuevaCompra.num_documento}
                   onChange={(e) =>
                     setNuevaCompra({ ...nuevaCompra, num_documento: e.target.value })
@@ -318,19 +352,20 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
             </div>
           </div>
 
-          {/* Columna Derecha: Detalles */}
-          <div className="flex-1 min-w-[600px]">
-            <div className="flex justify-between items-center">
-              <h2 className="font-bold text-lg">Detalles</h2>
+          {/* Columna Derecha: Detalles (min-w-0 permite que la tabla haga scroll en vez de desbordar) */}
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-center gap-2 flex-wrap">
+              <h2 className="font-bold text-lg">Productos</h2>
               <button
-                className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-700 transition"
-                onClick={agregarDetalle}
+                className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition"
+                onClick={handleAgregarProducto}
               >
-                Agregar Detalle
+                <Plus size={16} />
+                Agregar producto
               </button>
             </div>
 
-            <div className="overflow-x-auto border rounded p-2 h-[300px] bg-white">
+            <div className="mt-2 overflow-x-auto overflow-y-auto border rounded p-2 min-h-[180px] max-h-[45vh] bg-white">
               <table className="w-full text-xs">
                 <thead className="text-gray-700 uppercase bg-gray-50">
                   <tr>
@@ -404,8 +439,8 @@ const CreateModal = ({ isOpen, onClose, onCreated }) => {
                   })}
                   {nuevaCompra.detalles.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="text-center py-2 text-gray-400">
-                        No hay detalles agregados.
+                      <td colSpan={5} className="text-center py-4 text-gray-400">
+                        No hay productos agregados. Usa “Agregar producto”.
                       </td>
                     </tr>
                   )}

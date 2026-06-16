@@ -13,8 +13,9 @@ const ModalGrande = ({ isOpen, onClose, title, children }) => {
       backgroundColor: 'white',
       padding: '0',
       borderRadius: '8px',
-      maxWidth: '95vw',  // Aumentado de 80vw a 95vw
-      width: '1400px',   // Ancho fijo más grande
+      // Responsive: ocupa el 95% del viewport pero nunca más de 1400px.
+      width: '95vw',
+      maxWidth: '1400px',
       maxHeight: '85vh',
     },
     overlay: {

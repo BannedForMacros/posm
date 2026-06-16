@@ -94,13 +94,15 @@ export default function Index() {
       cell: row => {
         const serie = row.num_serie || '---';
         const numero = row.num_documento || '---';
+        const tipo = row.tipo_documento_descripcion || '';
         return (
-          <div className="font-medium">
-            {serie} - {numero}
+          <div>
+            <div className="font-medium">{serie} - {numero}</div>
+            {tipo && <div className="text-xs text-gray-500">{tipo}</div>}
           </div>
         );
       },
-      width: '140px',
+      width: '160px',
       sortable: true,
     },
     {

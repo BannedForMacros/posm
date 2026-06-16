@@ -18,12 +18,14 @@ public function index()
 
         $facturaciones = DB::table('facturacion')
             ->join('proveedores', 'facturacion.cod_proveedor', '=', 'proveedores.id')
+            ->leftJoin('tipo_documento', 'facturacion.tipo_documento', '=', 'tipo_documento.id')
             ->where('facturacion.estado', 1)
             ->where('proveedores.user_ruc', $rucUsuario)
             ->select(
                 'facturacion.*',
                 'proveedores.razon_social as nombre_proveedor',
-                'proveedores.ruc as ruc_proveedor'
+                'proveedores.ruc as ruc_proveedor',
+                'tipo_documento.descripcion as tipo_documento_descripcion'
             )
             ->orderBy('facturacion.created_at', 'desc')
             ->get();

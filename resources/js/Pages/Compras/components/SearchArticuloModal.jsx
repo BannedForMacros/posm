@@ -30,32 +30,29 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
           value={filtro}
           onChange={e => setFiltro(e.target.value)}
         />
-        <table className="w-full border">
+        <p className="text-xs text-gray-500">Haz clic en una fila para seleccionar el artículo.</p>
+        <table className="w-full border text-sm">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-2 py-1">Cod Art</th>
-              <th className="px-2 py-1">Nombre</th>
-              <th className="px-2 py-1">Acciones</th>
+              <th className="px-2 py-1 text-left w-24">Cod Art</th>
+              <th className="px-2 py-1 text-left">Nombre</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(art => (
-              <tr key={art.codarticulo} className="border-b">
+              <tr
+                key={art.codarticulo}
+                className="border-b cursor-pointer hover:bg-blue-50 transition-colors"
+                onClick={() => onSelect(art)}
+                title="Seleccionar artículo"
+              >
                 <td className="px-2 py-1">{art.codarticulo}</td>
                 <td className="px-2 py-1">{art.nombrearticulo || art.nombrecorto}</td>
-                <td className="px-2 py-1">
-                  <button
-                    className="bg-blue-500 text-white px-2 py-1 rounded"
-                    onClick={() => onSelect(art)}
-                  >
-                    Seleccionar
-                  </button>
-                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan="3" className="text-center py-2 text-gray-400">
+                <td colSpan="2" className="text-center py-2 text-gray-400">
                   Sin resultados
                 </td>
               </tr>

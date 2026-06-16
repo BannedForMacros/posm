@@ -6,11 +6,18 @@ const ViewModal = ({ isOpen, onClose, compra }) => {
   const [detalles, setDetalles] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Mapeo para convertir el id del tipo de documento a su descripción
+  // Respaldo: mapeo id -> descripción por si la compra no trae 'tipo_documento_descripcion'
+  // (el catálogo real vive en la tabla tipo_documento y lo devuelve el backend).
   const tipoDocumentoMapping = {
     1: 'Factura',
-    2: 'Boleta',
-    3: 'Otro'
+    2: 'Boleta de Venta',
+    3: 'Recibo por Honorarios',
+    4: 'Liquidación de Compra',
+    5: 'Nota de Crédito',
+    6: 'Nota de Débito',
+    7: 'Ticket / Máquina Registradora',
+    8: 'Recibo de Servicios Públicos',
+    9: 'Otro'
   };
 
   // Función para formatear la fecha
@@ -31,9 +38,12 @@ const ViewModal = ({ isOpen, onClose, compra }) => {
       ? `${compra.num_serie} - ${compra.num_documento}`
       : 'Sin número';
 
-  // Determinar la descripción del tipo de documento
+  // Determinar la descripción del tipo de documento:
+  // 1) la que devuelve el backend (catálogo real), 2) respaldo por id, 3) genérico.
   const tipoDocumentoDescripcion =
-    tipoDocumentoMapping[compra?.tipo_documento] || 'Documento';
+    compra?.tipo_documento_descripcion ||
+    tipoDocumentoMapping[compra?.tipo_documento] ||
+    'Documento';
 
   // Cargar detalles si no vienen en "compra.detalles"
   useEffect(() => {

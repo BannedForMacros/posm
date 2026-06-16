@@ -22,7 +22,7 @@ class AlmacenesController extends Controller
         }
 
         try {
-            $almacenes = DB::select("CALL sp_obtenerAlmacenesByUser(?)", [$user->ruc]);
+            $almacenes = DB::select("SELECT * FROM sp_obtenerAlmacenesByUser(?)", [$user->ruc]);
             return response()->json($almacenes, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -74,7 +74,7 @@ class AlmacenesController extends Controller
         }
 
         try {
-            $result = DB::select("CALL sp_crearAlmacenConSucursal(?, ?, ?)", [
+            $result = DB::select("SELECT * FROM sp_crearAlmacenConSucursal(?, ?, ?)", [
                 $request->sucursal_id,
                 $request->nombre,
                 $request->ubicacion
@@ -112,7 +112,7 @@ class AlmacenesController extends Controller
         }
 
         try {
-            DB::statement("CALL sp_actualizarAlmacen(?, ?, ?)", [
+            DB::statement("SELECT * FROM sp_actualizarAlmacen(?, ?, ?)", [
                 $id,
                 $request->nombre,
                 $request->ubicacion
@@ -141,7 +141,7 @@ class AlmacenesController extends Controller
         }
 
         try {
-            DB::statement("CALL sp_eliminarAlmacen(?)", [$id]);
+            DB::statement("SELECT * FROM sp_eliminarAlmacen(?)", [$id]);
 
             return response()->json([
                 'success' => true,

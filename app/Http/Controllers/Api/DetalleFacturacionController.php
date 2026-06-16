@@ -47,7 +47,7 @@ class DetalleFacturacionController extends Controller
         }
 
         try {
-            $detalles = DB::select("CALL sp_obtenerDetallesFacturacion(?)", [$facturacion_id]);
+            $detalles = DB::select("SELECT * FROM sp_obtenerDetallesFacturacion(?)", [$facturacion_id]);
             return response()->json($detalles);
         } catch (\Exception $e) {
             return response()->json([
@@ -73,7 +73,7 @@ class DetalleFacturacionController extends Controller
 
         try {
             DB::beginTransaction();
-            $result = DB::select("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
+            $result = DB::select("SELECT * FROM sp_crearDetalleFacturacion(?, ?, ?, ?)", [
                 $request->facturacion_id,
                 $request->cod_articulo,
                 $request->cantidad,
@@ -135,7 +135,7 @@ class DetalleFacturacionController extends Controller
 
         try {
             DB::beginTransaction();
-            DB::statement("CALL sp_actualizarDetalleFacturacion(?, ?, ?)", [
+            DB::statement("SELECT * FROM sp_actualizarDetalleFacturacion(?, ?, ?)", [
                 $id,
                 $request->cantidad,
                 $request->precio_unitario
@@ -162,7 +162,7 @@ class DetalleFacturacionController extends Controller
         }
 
         try {
-            DB::statement("CALL sp_eliminarDetalleFacturacion(?)", [$id]);
+            DB::statement("SELECT * FROM sp_eliminarDetalleFacturacion(?)", [$id]);
             return response()->json([
                 'success' => true,
                 'message' => 'Detalle eliminado lógicamente'

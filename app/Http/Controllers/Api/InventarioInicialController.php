@@ -24,7 +24,7 @@ class InventarioInicialController extends Controller
             $busqueda   = $request->query('busqueda', '');
 
             // Llamamos a tu SP (ajusta el nombre si cambió):
-            $lista = DB::select("CALL sp_listarArticulosInventario(?, ?, ?)", [
+            $lista = DB::select("SELECT * FROM sp_listarArticulosInventario(?, ?, ?)", [
                 $user->ruc,
                 $almacenId,
                 $busqueda
@@ -60,7 +60,7 @@ class InventarioInicialController extends Controller
 
         try {
             // Llamada a tu SP para registrar/actualizar stock inicial
-            $result = DB::select('CALL sp_registrarStockInicial(?, ?, ?, ?)', [
+            $result = DB::select('SELECT * FROM sp_registrarStockInicial(?, ?, ?, ?)', [
                 $user->ruc,
                 $request->almacen_id,
                 $request->cod_articulo,
@@ -168,7 +168,7 @@ class InventarioInicialController extends Controller
             $stockMax = $request->input('stock_maximo') === '' ? null : $request->input('stock_maximo');
 
             // Llamar al SP
-            DB::select('CALL sp_registrarStockMinMax(?, ?, ?, ?, ?)', [
+            DB::select('SELECT * FROM sp_registrarStockMinMax(?, ?, ?, ?, ?)', [
                 $user->ruc,
                 $request->almacen_id,
                 $request->cod_articulo,

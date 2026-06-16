@@ -65,7 +65,7 @@ public function index()
             DB::beginTransaction();
 
             // 1) Crear la cabecera Facturación vía SP
-            $result = DB::select("CALL sp_crearFacturacion(?, ?, ?, ?, ?, ?)", [
+            $result = DB::select("SELECT * FROM sp_crearFacturacion(?, ?, ?, ?, ?, ?)", [
                 $request->tipo_documento,
                 $request->num_serie,
                 $request->num_documento,
@@ -77,7 +77,7 @@ public function index()
 
             // 2) Crear los detalles vía SP
             foreach ($request->detalles as $detalle) {
-                DB::statement("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
+                DB::statement("SELECT * FROM sp_crearDetalleFacturacion(?, ?, ?, ?)", [
                     $facturacion_id,
                     $detalle['cod_articulo'],
                     $detalle['cantidad'],
@@ -199,14 +199,14 @@ public function index()
                 return response()->json(['error' => 'Facturación no encontrada'], 404);
             }
             // Obtener cabecera
-            $factArr = DB::select("CALL sp_obtenerFacturacion(?)", [$id]);
+            $factArr = DB::select("SELECT * FROM sp_obtenerFacturacion(?)", [$id]);
             if (empty($factArr)) {
                 return response()->json(['error' => 'Facturación no encontrada o inactiva'], 404);
             }
             $fact = $factArr[0];
 
             // Obtener detalles
-            $detalles = DB::select("CALL sp_obtenerDetallesFacturacion(?)", [$id]);
+            $detalles = DB::select("SELECT * FROM sp_obtenerDetallesFacturacion(?)", [$id]);
 
             return response()->json([
                 'facturacion' => $fact,
@@ -238,7 +238,7 @@ public function index()
             DB::beginTransaction();
 
             // Actualizar la cabecera
-            DB::statement("CALL sp_actualizarFacturacion(?, ?, ?)", [
+            DB::statement("SELECT * FROM sp_actualizarFacturacion(?, ?, ?)", [
                 $id,
                 $request->fecha,
                 $request->valor_compra
@@ -247,14 +247,14 @@ public function index()
             // Si llegan detalles, se reemplazan; si no, solo se actualizó la cabecera
             if ($request->filled('detalles')) {
                 // Eliminar lógicamente los detalles anteriores
-                $detallesExist = DB::select("CALL sp_obtenerDetallesFacturacion(?)", [$id]);
+                $detallesExist = DB::select("SELECT * FROM sp_obtenerDetallesFacturacion(?)", [$id]);
                 foreach ($detallesExist as $detalle) {
-                    DB::statement("CALL sp_eliminarDetalleFacturacion(?)", [$detalle->id]);
+                    DB::statement("SELECT * FROM sp_eliminarDetalleFacturacion(?)", [$detalle->id]);
                 }
 
                 // Insertar los nuevos
                 foreach ($request->detalles as $detalle) {
-                    DB::statement("CALL sp_crearDetalleFacturacion(?, ?, ?, ?)", [
+                    DB::statement("SELECT * FROM sp_crearDetalleFacturacion(?, ?, ?, ?)", [
                         $id,
                         $detalle['cod_articulo'],
                         $detalle['cantidad'],
@@ -285,7 +285,7 @@ public function index()
                 return response()->json(['error' => 'Facturación no encontrada'], 404);
             }
             // Eliminar lógicamente la cabecera
-            DB::statement("CALL sp_eliminarFacturacion(?)", [$id]);
+            DB::statement("SELECT * FROM sp_eliminarFacturacion(?)", [$id]);
             return response()->json([
                 'success' => true,
                 'message' => 'Facturación eliminada lógicamente'

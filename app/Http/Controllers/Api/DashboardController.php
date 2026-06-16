@@ -31,40 +31,40 @@ class DashboardController extends Controller
             // 1) Estadísticas Generales (clientes únicos)
             $stats = DB::selectOne("
                 SELECT
-                    IFNULL(SUM(TOTAL_VENTA), 0) AS total_ventas,
+                    COALESCE(SUM(\"TOTAL_VENTA\"), 0) AS total_ventas,
                     COUNT(*) AS total_transacciones,
-                    IFNULL(AVG(TOTAL_VENTA), 0) AS promedio_venta,
+                    COALESCE(AVG(\"TOTAL_VENTA\"), 0) AS promedio_venta,
 
                     -- Contar clientes únicos
                     COUNT(
                       DISTINCT CASE
-                        WHEN TIPODOCUMENTOCLI IN ('RUC','DNI','CE','PAS')
-                          THEN NUMERODOCUMENTOCLI
-                        ELSE RAZONSOCIALCLI
+                        WHEN \"TIPODOCUMENTOCLI\" IN ('RUC','DNI','CE','PAS')
+                          THEN \"NUMERODOCUMENTOCLI\"
+                        ELSE \"RAZONSOCIALCLI\"
                       END
                     ) AS clientes_unicos
 
                 FROM ventas
                 WHERE
-                    RUCEMPRESA = ?
-                    AND (? IS NULL OR MONTH(FEMI_VENTA) = ?)
-                    AND (? IS NULL OR YEAR(FEMI_VENTA) = ?)
+                    \"RUCEMPRESA\" = ?
+                    AND (?::int IS NULL OR EXTRACT(MONTH FROM femi_to_date(\"FEMI_VENTA\"))::int = ?::int)
+                    AND (?::int IS NULL OR EXTRACT(YEAR  FROM femi_to_date(\"FEMI_VENTA\"))::int = ?::int)
             ", [$ruc, $mes, $mes, $anio, $anio]);
 
             // 2) Ventas por Día
-            $ventasPorDia = DB::select("CALL sp_GraficaVentasPorDia(?, ?, ?)", [$mes, $anio, $ruc]);
+            $ventasPorDia = DB::select("SELECT * FROM \"sp_GraficaVentasPorDia\"(?, ?, ?)", [$mes, $anio, $ruc]);
 
             // 3) Ventas por Forma de Pago
-            $ventasPorFormaPago = DB::select("CALL sp_GraficaVentasPorFormaPago(?, ?, ?)", [$mes, $anio, $ruc]);
+            $ventasPorFormaPago = DB::select("SELECT * FROM \"sp_GraficaVentasPorFormaPago\"(?, ?, ?)", [$mes, $anio, $ruc]);
 
             // 4) Ventas por Artículo
-            $ventasPorArticulo = DB::select("CALL sp_GraficaVentasPorArticulo(?, ?, ?)", [$mes, $anio, $ruc]);
+            $ventasPorArticulo = DB::select("SELECT * FROM \"sp_GraficaVentasPorArticulo\"(?, ?, ?)", [$mes, $anio, $ruc]);
 
             // 5) Top Artículos
-            $topArticulos = DB::select("CALL sp_GraficaTopArticulos(?, ?, ?, ?)", [$mes, $anio, $limite, $ruc]);
+            $topArticulos = DB::select("SELECT * FROM \"sp_GraficaTopArticulos\"(?, ?, ?, ?)", [$mes, $anio, $limite, $ruc]);
 
             // 6) Ventas por Sucursal (nuevo)
-            $ventasPorSucursal = DB::select("CALL sp_GraficaVentasPorSucursal(?, ?, ?)", [$mes, $anio, $ruc]);
+            $ventasPorSucursal = DB::select("SELECT * FROM \"sp_GraficaVentasPorSucursal\"(?, ?, ?)", [$mes, $anio, $ruc]);
 
             return response()->json([
                 'success' => true,

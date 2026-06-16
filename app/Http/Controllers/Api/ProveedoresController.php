@@ -50,7 +50,7 @@ class ProveedoresController extends Controller
             // o $request->user()->ruc, según tu configuración
     
             // Llamar al SP con 6 parámetros (ahora tenemos p_user_ruc)
-            $result = DB::select("CALL sp_crearProveedor(?, ?, ?, ?, ?, ?)", [
+            $result = DB::select("SELECT * FROM sp_crearProveedor(?, ?, ?, ?, ?, ?)", [
                 $request->ruc,
                 $request->razon_social,
                 $request->direccion,
@@ -97,7 +97,7 @@ class ProveedoresController extends Controller
             if (!$this->perteneceAlUsuario($id)) {
                 return response()->json(['error' => 'Proveedor no encontrado'], 404);
             }
-            $proveedorArr = DB::select("CALL sp_obtenerProveedor(?)", [$id]);
+            $proveedorArr = DB::select("SELECT * FROM sp_obtenerProveedor(?)", [$id]);
             if (empty($proveedorArr)) {
                 return response()->json(['error' => 'Proveedor no encontrado o inactivo'], 404);
             }
@@ -128,7 +128,7 @@ class ProveedoresController extends Controller
             }
 
             DB::beginTransaction();
-            DB::statement("CALL sp_actualizarProveedor(?, ?, ?, ?, ?)", [
+            DB::statement("SELECT * FROM sp_actualizarProveedor(?, ?, ?, ?, ?)", [
                 $id,
                 $request->razon_social,
                 $request->direccion,
@@ -158,7 +158,7 @@ class ProveedoresController extends Controller
             if (!$this->perteneceAlUsuario($id)) {
                 return response()->json(['error' => 'Proveedor no encontrado'], 404);
             }
-            DB::statement("CALL sp_eliminarProveedor(?)", [$id]);
+            DB::statement("SELECT * FROM sp_eliminarProveedor(?)", [$id]);
             return response()->json([
                 'success' => true,
                 'message' => 'Proveedor eliminado lógicamente'

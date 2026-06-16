@@ -57,9 +57,11 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            // En PHP 8.5 la constante PDO::MYSQL_ATTR_SSL_CA está deprecada y emitía un aviso
+            // en cada request. En dev usamos Postgres, así que dejamos options vacío. Si se
+            // vuelve a usar MySQL con SSL, restaurar:
+            //   array_filter([\Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA')]).
+            'options' => [],
         ],
 
         'mariadb' => [
@@ -77,9 +79,11 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            // En PHP 8.5 la constante PDO::MYSQL_ATTR_SSL_CA está deprecada y emitía un aviso
+            // en cada request. En dev usamos Postgres, así que dejamos options vacío. Si se
+            // vuelve a usar MySQL con SSL, restaurar:
+            //   array_filter([\Pdo\Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA')]).
+            'options' => [],
         ],
 
         'pgsql' => [

@@ -48,7 +48,7 @@ class ArticuloController extends Controller
         try {
             // Llamada al procedimiento almacenado para obtener el detalle del artículo
             // (filtra por el ruc del usuario: los artículos son por empresa).
-            $resultado = DB::select("CALL ObtenerArticuloDetalle(?, ?)", [$id, auth()->user()->ruc]);
+            $resultado = DB::select("SELECT * FROM \"ObtenerArticuloDetalle\"(?, ?)", [$id, auth()->user()->ruc]);
             if (empty($resultado)) {
                 return response()->json(['message' => 'Artículo no encontrado'], 404);
             }

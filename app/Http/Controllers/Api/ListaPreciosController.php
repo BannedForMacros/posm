@@ -21,7 +21,7 @@ class ListaPreciosController extends Controller
 
         try {
             // Llamamos al SP sp_obtenerListasPorRUC
-            $listas = DB::select("CALL sp_obtenerListasPorRUC(?)", [$user->ruc]);
+            $listas = DB::select("SELECT * FROM sp_obtenerListasPorRUC(?)", [$user->ruc]);
             return response()->json($listas);
         } catch (\Exception $e) {
             return response()->json([
@@ -55,7 +55,7 @@ class ListaPreciosController extends Controller
             DB::beginTransaction();
 
             // 1) Crear la lista
-            $resultLista = DB::select("CALL sp_crearListaPrecios(?, ?)", [
+            $resultLista = DB::select("SELECT * FROM sp_crearListaPrecios(?, ?)", [
                 $user->ruc,
                 $request->nombre
             ]);
@@ -70,7 +70,7 @@ class ListaPreciosController extends Controller
             //    (lista_id, cod_articulo, cod_unidad, precio).
             //    Si el frontend no envía unidad, se usa 1 = "unidad".
             foreach ($request->detalle as $item) {
-                DB::statement("CALL sp_crearDetalleListaPrecios(?, ?, ?, ?)", [
+                DB::statement("SELECT * FROM sp_crearDetalleListaPrecios(?, ?, ?, ?)", [
                     $lista_id,
                     $item['cod_articulo'],
                     $item['cod_unidad'] ?? 1,
@@ -116,7 +116,7 @@ class ListaPreciosController extends Controller
 
         try {
             // Llamamos al SP para obtener el detalle de la lista
-            $detalle = DB::select("CALL sp_obtenerDetalleListaPrecios(?)", [$id]);
+            $detalle = DB::select("SELECT * FROM sp_obtenerDetalleListaPrecios(?)", [$id]);
             
             // Realizamos una consulta adicional para obtener el nombre real de la lista
             $lista = DB::table('lista_precios')->where('id', $id)->first();
@@ -162,7 +162,7 @@ class ListaPreciosController extends Controller
         try {
             DB::beginTransaction();
             foreach ($request->all() as $item) {
-                DB::statement("CALL sp_editarDetalleListaPrecios(?, ?, ?, ?)", [
+                DB::statement("SELECT * FROM sp_editarDetalleListaPrecios(?, ?, ?, ?)", [
                     $id,
                     $item['cod_articulo'],
                     $item['cod_unidad'],
@@ -194,7 +194,7 @@ class ListaPreciosController extends Controller
         }
 
         try {
-            DB::statement("CALL sp_desactivarListaPrecios(?)", [$id]);
+            DB::statement("SELECT * FROM sp_desactivarListaPrecios(?)", [$id]);
             return response()->json([
                 'success' => true,
                 'message' => 'Lista desactivada'

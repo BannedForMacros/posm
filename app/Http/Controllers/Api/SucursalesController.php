@@ -21,7 +21,7 @@ class SucursalesController extends Controller
         
         try {
             // Llamamos al SP para leer sucursales
-            $sucursales = DB::select("CALL usp_sucursales_read(?)", [$user->ruc]);
+            $sucursales = DB::select("SELECT * FROM usp_sucursales_read(?)", [$user->ruc]);
     
             // Filtramos las sucursales para devolver solo aquellas con estado = 1
             $sucursalesFiltradas = array_filter($sucursales, function($sucursal) {
@@ -59,7 +59,7 @@ class SucursalesController extends Controller
             DB::beginTransaction();
     
             // Ejecuta el stored procedure para insertar la sucursal
-            DB::statement("CALL usp_sucursales_create(?, ?, ?)", [
+            DB::statement("SELECT * FROM usp_sucursales_create(?, ?, ?)", [
                 $user->ruc,
                 $request->nombre,
                 $request->direccion
@@ -113,7 +113,7 @@ class SucursalesController extends Controller
             if (!$this->perteneceAlUsuario($id)) {
                 return response()->json(['error' => 'Sucursal no encontrada'], 404);
             }
-            DB::statement("CALL usp_sucursales_update(?, ?, ?)", [
+            DB::statement("SELECT * FROM usp_sucursales_update(?, ?, ?)", [
                 $id,
                 $request->nombre,
                 $request->direccion
@@ -140,7 +140,7 @@ class SucursalesController extends Controller
             if (!$this->perteneceAlUsuario($id)) {
                 return response()->json(['error' => 'Sucursal no encontrada'], 404);
             }
-            DB::statement("CALL usp_sucursales_delete(?)", [$id]);
+            DB::statement("SELECT * FROM usp_sucursales_delete(?)", [$id]);
             return response()->json([
                 'success' => true,
                 'message' => 'Sucursal eliminada lógicamente'

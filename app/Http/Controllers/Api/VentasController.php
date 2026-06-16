@@ -32,7 +32,7 @@ class VentasController extends Controller
 
         try {
             // Llamar al procedimiento almacenado para obtener ventas
-            $ventas = DB::select("CALL ObtenerVentasPorRUC(?)", [$ruc]);
+            $ventas = DB::select("SELECT * FROM \"ObtenerVentasPorRUC\"(?)", [$ruc]);
             return response()->json($ventas);
         } catch (\Exception $e) {
             return response()->json([
@@ -151,7 +151,7 @@ class VentasController extends Controller
                      ->where('RUCEMPRESA', $rucUsuario)
                      ->where('COD_DOCUMENTO', $codDocumento)
                      ->where('SERI_VENTA', $seriVenta)
-                     ->max(DB::raw('CAST(NUME_VENTA AS UNSIGNED)'));
+                     ->max(DB::raw('CAST("NUME_VENTA" AS INTEGER)'));
                  $numeVenta = str_pad(((int) $ultimo) + 1, 8, '0', STR_PAD_LEFT);
              }
 
@@ -304,7 +304,7 @@ class VentasController extends Controller
             // Llamar al procedimiento almacenado para obtener detalles de la venta
             // (incluye el ruc: la PK de ventas es compuesta y la misma serie/número
             // puede existir en otra empresa).
-            $detalles = DB::select("CALL ObtenerDetallesVenta(?, ?, ?, ?)", [
+            $detalles = DB::select("SELECT * FROM \"ObtenerDetallesVenta\"(?, ?, ?, ?)", [
                 $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($detalles);
@@ -331,7 +331,7 @@ class VentasController extends Controller
         try {
             // Llamar al procedimiento almacenado para obtener formas de pago
             // (incluye el ruc para no mezclar ventas de otra empresa)
-            $formasPago = DB::select("CALL ObtenerFormasPagoVenta(?, ?, ?, ?)", [
+            $formasPago = DB::select("SELECT * FROM \"ObtenerFormasPagoVenta\"(?, ?, ?, ?)", [
                 $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
             ]);
             return response()->json($formasPago);

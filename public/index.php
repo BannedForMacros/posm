@@ -1,4 +1,9 @@
 <?php
+// PHP 8.5: el framework (Laravel 11) fusiona su config por defecto, que referencia la constante
+// deprecada PDO::MYSQL_ATTR_SSL_CA y emitía avisos "Deprecated" en cada request. En dev usamos
+// Postgres, así que silenciamos solo los avisos de deprecación (no afecta errores/warnings reales).
+error_reporting(E_ALL & ~E_DEPRECATED);
+
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 

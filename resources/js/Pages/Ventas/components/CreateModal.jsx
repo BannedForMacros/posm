@@ -13,8 +13,8 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
     document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
     '';
 
-  // Estado principal de la venta con fecha por defecto (fecha actual)
-  const [nuevaVenta, setNuevaVenta] = useState({
+  // Estado inicial de la venta (función para que la fecha sea la actual en cada apertura)
+  const crearEstadoInicial = () => ({
     cod_documento: '01', // "01"=Factura, "03"=Boleta, etc.
     seri_venta: '',
     nume_venta: '',
@@ -26,6 +26,9 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
     total_venta: '0.00',
     detalles: []
   });
+
+  // Estado principal de la venta con fecha por defecto (fecha actual)
+  const [nuevaVenta, setNuevaVenta] = useState(crearEstadoInicial);
 
   // Almacén (por si necesitas)
   const [almacenId, setAlmacenId] = useState('');
@@ -40,10 +43,13 @@ const CreateSaleModal = ({ isOpen, onClose, onCreated }) => {
   // Refs para focus en “cantidad”
   const cantidadRefs = useRef([]);
 
-  // Efecto: al abrir modal => cargar almacenes, etc.
+  // Efecto: al abrir modal => reiniciar el formulario y cargar almacenes.
+  // (El modal queda montado; sin reset conservaría los datos de la venta anterior.)
   useEffect(() => {
     if (isOpen) {
-      // Puedes resetear o cargar datos si lo deseas
+      setNuevaVenta(crearEstadoInicial());
+      setAlmacenId('');
+      setDetalleIndexEnEdicion(null);
       cargarAlmacenes();
     }
   }, [isOpen]);

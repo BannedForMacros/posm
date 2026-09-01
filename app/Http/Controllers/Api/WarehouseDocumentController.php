@@ -39,11 +39,15 @@ class WarehouseDocumentController extends Controller
 public function show($id)
 {
     try {
-        // Usamos Eloquent con las relaciones:
-        // 'almacen', 'user', 'operacion', 'facturacion', 'venta', y 'detalles.articulo'
+        // Usamos Eloquent con las relaciones disponibles:
+        // 'almacen', 'user', 'operacion', 'facturacion', y 'detalles.articulo'.
+        //
         // NOTA: no se carga 'venta' — la FK warehouse_document.venta_id apunta a
-        // ventas_backup(id) y la tabla ventas real no tiene columna id, por lo
-        // que cargar esa relación lanza "Column not found" cuando venta_id != null.
+        // ventas_backup(id) (tabla legacy/scaffolding) y la tabla ventas real no
+        // tiene columna id. Si venta_id tuviera un valor no nulo, intentar
+        // belongsTo(App\Models\Venta) lanzaría "Column not found". Además,
+        // VentasController::store crea nuevos documentos con venta_id = NULL,
+        // por lo que en la práctica actual no hay datos que resolver aquí.
         $doc = \App\Models\WarehouseDocument::with([
             'almacen',
             'user',

@@ -15,6 +15,8 @@ class Facturacion extends Model
         'cod_proveedor',
         'fecha',
         'valor_compra',
+        'sucursal_id',
+        'almacen_id',
         'estado',
         'created_at',
         'updated_at'

@@ -234,7 +234,12 @@ class VentasController extends Controller
                  ]);
              }
 
-             // 6) Crear la cabecera del documento de almacén (movimiento de salida)
+             // 6) Crear la cabecera del documento de almacén (movimiento de salida).
+             //    Se deja venta_id = NULL porque warehouse_document.venta_id
+             //    referencia a la tabla legacy ventas_backup(id), no a ventas,
+             //    y la tabla ventas no tiene una PK simple (id). El vínculo real
+             //    entre la venta y su documento de almacén queda implícito por
+             //    ruc + almacen_id + operacion_id (venta) + fecha + detalles.
              $warehouseDoc = new WarehouseDocument();
              $warehouseDoc->ruc             = $rucUsuario;
              $warehouseDoc->almacen_id      = $request->almacen_id;

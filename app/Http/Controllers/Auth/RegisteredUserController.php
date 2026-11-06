@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,6 +27,8 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
+     * Crea la empresa (tenant) y deja al usuario como su administrador.
+     *
      * @throws \Illuminate\Validation\ValidationException
      */
     public function store(Request $request): RedirectResponse
@@ -34,20 +37,38 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             // RUC peruano: exactamente 11 dígitos (la columna es varchar(11))
-            'ruc' => 'required|digits:11|unique:users,ruc',
+            'ruc' => 'required|digits:11|unique:empresas,ruc',
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'ruc' => $request->ruc,
-            'password' => Hash::make($request->password),
-        ]);
+        [$user, $empresa] = DB::transaction(function () use ($request) {
+            $empresa = Empresa::create([
+                'ruc' => $request->ruc,
+                'razon_social' => $request->name,
+                'estado' => true,
+            ]);
+
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'ruc' => $request->ruc,
+                'password' => $request->password,
+                'is_superadmin' => false,
+                'activo' => true,
+            ]);
+
+            $empresa->users()->attach($user->id, [
+                'rol' => 'admin',
+                'activo' => true,
+            ]);
+
+            return [$user, $empresa];
+        });
 
         event(new Registered($user));
 
         Auth::login($user);
+        $request->session()->put('empresa_activa_id', $empresa->id);
 
         return redirect(route('dashboard', absolute: false));
     }

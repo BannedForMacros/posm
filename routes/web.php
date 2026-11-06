@@ -22,6 +22,12 @@ use App\Http\Controllers\Api\InventarioController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DetalleFacturacionController;
 use App\Http\Controllers\Api\TipoDocumentoController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\EmpresaController as AdminEmpresaController;
+use App\Http\Controllers\Admin\LocalController as AdminLocalController;
+use App\Http\Controllers\Admin\UsuarioController as AdminUsuarioController;
+use App\Http\Controllers\EmpresaActivaController;
+use App\Http\Controllers\ProfileController;
 
 
 
@@ -40,8 +46,56 @@ Route::get('/login', function () {
     return Inertia::render('Auth/Login');
 })->name('login');
 
-// Rutas protegidas por autenticación
-Route::middleware(['auth'])->group(function () {
+// Perfil del usuario (disponible incluso sin empresa activa)
+Route::middleware(['auth', 'tenant'])->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+// Selector de empresa y páginas sin tenant asignado
+Route::middleware(['auth', 'tenant'])->group(function () {
+    Route::get('/sin-empresa', function () {
+        return Inertia::render('SinEmpresa');
+    })->name('sin-empresa');
+
+    Route::post('/empresa-activa/{empresa}', [EmpresaActivaController::class, 'store'])
+        ->name('empresa-activa.store');
+
+    Route::delete('/empresa-activa', [EmpresaActivaController::class, 'destroy'])
+        ->name('empresa-activa.destroy');
+});
+
+// Panel del superadministrador (usuarios, empresas y locales)
+Route::middleware(['auth', 'tenant', 'superadmin'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('/empresas', [AdminEmpresaController::class, 'index'])->name('empresas.index');
+        Route::post('/empresas', [AdminEmpresaController::class, 'store'])->name('empresas.store');
+        Route::get('/empresas/{empresa}', [AdminEmpresaController::class, 'show'])->name('empresas.show');
+        Route::put('/empresas/{empresa}', [AdminEmpresaController::class, 'update'])->name('empresas.update');
+        Route::patch('/empresas/{empresa}/estado', [AdminEmpresaController::class, 'toggleEstado'])->name('empresas.estado');
+        Route::post('/empresas/{empresa}/usuarios', [AdminEmpresaController::class, 'attachUser'])->name('empresas.usuarios.store');
+        Route::delete('/empresas/{empresa}/usuarios/{usuario}', [AdminEmpresaController::class, 'detachUser'])->name('empresas.usuarios.destroy');
+        Route::post('/empresas/{empresa}/entrar', [EmpresaActivaController::class, 'store'])->name('empresas.entrar');
+
+        Route::get('/usuarios', [AdminUsuarioController::class, 'index'])->name('usuarios.index');
+        Route::post('/usuarios', [AdminUsuarioController::class, 'store'])->name('usuarios.store');
+        Route::put('/usuarios/{usuario}', [AdminUsuarioController::class, 'update'])->name('usuarios.update');
+        Route::patch('/usuarios/{usuario}/estado', [AdminUsuarioController::class, 'toggleEstado'])->name('usuarios.estado');
+        Route::delete('/usuarios/{usuario}', [AdminUsuarioController::class, 'destroy'])->name('usuarios.destroy');
+
+        Route::get('/locales', [AdminLocalController::class, 'index'])->name('locales.index');
+        Route::post('/locales', [AdminLocalController::class, 'store'])->name('locales.store');
+        Route::put('/locales/{local}', [AdminLocalController::class, 'update'])->name('locales.update');
+        Route::patch('/locales/{local}/estado', [AdminLocalController::class, 'toggleEstado'])->name('locales.estado');
+    });
+
+// Rutas protegidas por autenticación y con empresa activa
+Route::middleware(['auth', 'tenant', 'empresa'])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Dashboard', [
             'user' => auth()->user(),

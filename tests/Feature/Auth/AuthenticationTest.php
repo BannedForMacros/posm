@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,7 +28,28 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
+        $response->assertRedirect(route('sin-empresa', absolute: false));
+    }
+
+    public function test_users_with_empresa_are_redirected_to_the_dashboard(): void
+    {
+        $empresa = Empresa::create([
+            'ruc' => '20123456789',
+            'razon_social' => 'Empresa de Prueba SAC',
+            'estado' => true,
+        ]);
+
+        $user = User::factory()->create();
+        $user->empresas()->attach($empresa->id, ['rol' => 'admin', 'activo' => true]);
+
+        $response = $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+        $this->assertSame($empresa->id, session('empresa_activa_id'));
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void

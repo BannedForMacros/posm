@@ -7,6 +7,43 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## POS.M — POS web multiempresa
+
+Aplicación de punto de venta y gestión construida con **Laravel 11 + Inertia.js + React**.
+
+- **Multiempresa real**: una empresa (`empresas.ruc`) puede tener varios usuarios y un usuario
+  puede pertenecer a varias empresas con rol `admin` u `operador`.
+- **Superadministrador** (`users.is_superadmin`): panel en `/admin` para gestionar empresas,
+  usuarios y locales. Se promueve con:
+  `php artisan posm:superadmin correo@ejemplo.com` (`--revoke` para quitar el rol).
+- **Selector de empresa** en el sidebar; la empresa activa se guarda en sesión.
+- **Aislamiento por tenant** mediante `App\Support\TenantContext` y los middleware
+  `tenant`, `empresa` y `superadmin`.
+
+### Puesta en marcha
+
+```bash
+composer install
+npm install
+cp .env.example .env
+php artisan key:generate
+# Configura MySQL en .env y carga el esquema base (storage/app/schema_tables.sql)
+php artisan migrate        # aplica las migraciones multiempresa (2026_10_26_*)
+npm run build
+php artisan serve
+```
+
+### Pruebas
+
+```bash
+vendor/bin/phpunit
+```
+
+Las pruebas usan SQLite en memoria (`phpunit.xml`) y no dependen del build de Vite.
+
+Más contexto técnico (esquema, stored procedures, convenciones y trampas) en
+[`CLAUDE.md`](./CLAUDE.md).
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:

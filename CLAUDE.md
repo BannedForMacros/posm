@@ -1,13 +1,13 @@
 # CLAUDE.md — Contexto del proyecto posmweb
 
 Guía para asistentes de IA (y desarrolladores) que trabajen en este repositorio.
-Última actualización del contexto: 2026-06-16.
+Última actualización del contexto: 2026-11-06.
 
 ## Qué es
 
 POS web **multi-empresa (multi-tenant)** construido con **Laravel 11 + Inertia.js + React 18/19**.
-Cada empresa se identifica por su **`ruc`** (columna en la tabla `users`); casi todos los datos
-de negocio se filtran por el `ruc` del usuario autenticado. Es un panel de gestión (artículos,
+Cada empresa se identifica por su **`ruc`** en la tabla `empresas`; los datos de negocio se filtran
+por el RUC de la **empresa activa** (ver sección Multiempresa). Es un panel de gestión (artículos,
 familias, proveedores, compras, almacenes, inventario, listas de precios, ventas, dashboard) que
 convive con un **POS de escritorio externo** (sobre todo en la tabla `ventas` y vía varios stored
 procedures `Ins*`/`Get*`/`Upd*Dmk`). Nota: el dev local del panel web se migró a **PostgreSQL**,
@@ -20,6 +20,36 @@ mientras que el POS de escritorio sigue sobre la base **MySQL** remota (ver secc
 - **Build**: `npm run build` · **Dev**: `npm run dev` (Vite) · servidor: `php artisan serve`.
 - **Rutas**: `php artisan route:list`. **Lint PHP**: `php -l <archivo>`.
 - **Instalar deps**: `composer install --ignore-platform-req=php` (necesario en PHP 8.5: el lock pide ≤8.4) · `npm install`.
+- **Tests**: `vendor/bin/phpunit` (SQLite en memoria; `php artisan test` no está disponible).
+
+## Multiempresa (implementado oct 2026)
+
+- **Fuente de verdad del tenant**: `App\Support\TenantContext` (singleton). Lo resuelve el
+  middleware `tenant` (`ResolveEmpresaActiva`), que lee `empresa_activa_id` de la sesión y valida
+  que el usuario pertenezca a la empresa. `User::ruc` es un **accessor** que devuelve el RUC de la
+  empresa activa; la columna `users.ruc` queda como dato legado/por defecto.
+- **Modelos**: `Empresa` (PK `id`, `ruc` único) y pivote `empresa_user` (`rol`: `admin`/`operador`,
+  `activo`). Helpers en `User`: `empresas()`, `empresasDisponibles()`, `esSuperadmin()`,
+  `perteneceAEmpresa()`, `rolEnEmpresa()`.
+- **Locales**: la tabla `sucursal` incorpora `empresa_id`; `user_ruc` se mantiene sincronizado con
+  el RUC de la empresa para no romper los stored procedures existentes.
+- **Middleware** (`bootstrap/app.php`): `tenant` (resuelve la empresa activa), `empresa` (exige
+  empresa; redirige a `/sin-empresa` o `/admin`), `superadmin` (protege `/admin`).
+- **Panel superadmin** (`/admin`): dashboard, empresas (con usuarios y locales), usuarios (con
+  membresías múltiples) y locales. Rutas con prefijo/nombre `admin.*` en `routes/web.php`.
+- **Selector de empresa**: en el sidebar; `POST /empresa-activa/{empresa}` y
+  `DELETE /empresa-activa`. La empresa activa vive **en sesión**, no en base de datos.
+- **Registro público**: crea automáticamente la empresa y deja al usuario como `admin` de ella.
+- **Migraciones nuevas**: `2026_10_26_000001` (empresas + pivote), `000002` (columnas en `users`),
+  `000003` (repunta FKs de `users.ruc`, `inventario`, `inventario_inicial`, `proveedores`,
+  `sucursal` y `warehouse_document` a `empresas.ruc`, con backfill) y `000004` (`empresa_id` en
+  `sucursal`). La `000003` funciona en **MySQL y PostgreSQL** (probada contra una copia de la BD de
+  producción). `2026_11_06_000001` corrige datos detectados en esa prueba: crea la operación
+  `operacion.id=2` "Venta" (sin ella toda venta fallaba por FK), resincroniza las secuencias de
+  Postgres (crear usuarios fallaba por `users_pkey`) y hace el RUC de proveedor único **por empresa**.
+- **Comando**: `php artisan posm:superadmin correo@ejemplo.com` (`--revoke` para quitar el rol).
+- **Tests**: `tests/Feature/Admin/MultitenancyTest.php` cubre panel, membresías múltiples, cambio
+  de empresa y aislamiento por tenant.
 
 ## Base de datos (¡leer antes de tocar nada de datos!)
 
@@ -54,8 +84,9 @@ mientras que el POS de escritorio sigue sobre la base **MySQL** remota (ver secc
    `X-CSRF-TOKEN`** (tomado de `<meta name="csrf-token">`). Los `axios` lo mandan solo.
    `routes/api.php` sí está registrado en `bootstrap/app.php`, pero casi no se usa.
 2. **Multi-tenant por `ruc`**: todo listado/lectura/escritura de datos de negocio debe filtrar por
-   `auth()->user()->ruc`. Para operaciones por `id`, verificar pertenencia antes de modificar/borrar
-   (patrón `perteneceAlUsuario($id)` en los controladores).
+   `auth()->user()->ruc` (accessor que devuelve el RUC de la **empresa activa**). Para operaciones
+   por `id`, verificar pertenencia antes de modificar/borrar (patrón `perteneceAlUsuario($id)` en
+   los controladores). No uses `users.ruc` directamente: la fuente de verdad es `TenantContext`.
 3. **`familia.codfamilia` es PK GLOBAL** (varchar(6), no compuesta con ruc). Los correlativos de
    familia se generan globalmente, NO por ruc (si filtras por ruc al generar, colisionan entre empresas).
    Códigos: familia = 3 dígitos ("001"), subfamilia = 6 dígitos ("001002" = familia 001 + sub 002).
@@ -68,7 +99,8 @@ mientras que el POS de escritorio sigue sobre la base **MySQL** remota (ver secc
 5. **`FEMI_VENTA` es texto** y el dashboard lo parsea con el helper `femi_to_date("FEMI_VENTA")`
    (función Postgres que envuelve `to_date(..., 'YYYY-MM-DD')` de forma segura ante nulos/vacíos):
    al insertar ventas, la fecha debe ir en formato `Y-m-d`.
-6. **El usuario (`User`) solo tiene `name, email, ruc, password`.** No hay razón social ni roles.
+6. **El usuario (`User`) tiene `name, email, ruc (legado), password, is_superadmin, activo`.**
+   Los roles (`admin`/`operador`) viven en el pivote `empresa_user`, no en `users`.
 7. **Casing de imports en React**: la carpeta real es `@/Components` (mayúscula) y los componentes
    `Button.jsx`/`Input.jsx` (mayúscula). Importar en minúscula funciona en Windows pero rompe el
    build en Linux/CI. Mantener el casing correcto.
@@ -144,8 +176,13 @@ El entorno de desarrollo local se migró de MySQL/XAMPP a **PostgreSQL 17**. Qu�
   el sistema externo.
 - **Doble fuente de stock**: el stock inicial vive en `inventario_inicial` y el stock operativo en
   `inventario`. Son tablas paralelas que pueden descuadrarse — revisar diseño si se reporta.
-- **Sin sistema de roles**: cualquier usuario autenticado puede modificar catálogos globales
-  compartidos (operaciones SUNAT, tipos de documento). Importa solo con varios clientes.
+- **Roles básicos**: existen `admin`/`operador` por empresa y `is_superadmin`, pero todavía no hay
+  permisos granulares por módulo: cualquier usuario con empresa activa puede modificar catálogos
+  globales compartidos (operaciones SUNAT, tipos de documento).
+- **Desplegar multiempresa a producción** (`ssh dbperu`, `/opt/posm`, Postgres `dbperu-db`/`posm`):
+  respaldar la BD, `php artisan migrate --force` (aplica `2026_10_26_000001..000004` y
+  `2026_11_06_000001`), `npm run build`, y crear el superadmin con `php artisan posm:superadmin`.
+- **Inertia v2**: `form.transform()` NO es encadenable (devuelve undefined). Llamarlo y luego `form.post()`.
 - **Producción**: poner `APP_DEBUG=false` y `SESSION_SECURE_COOKIE=true` (con HTTPS) en el `.env`.
 
 ## Reglas para asistentes de IA

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ProveedoresController extends Controller
 {
@@ -35,7 +36,11 @@ class ProveedoresController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'ruc'          => 'required|string|size:11|unique:proveedores,ruc',
+            // Único por empresa (entre proveedores activos): varias empresas pueden
+            // registrar al mismo proveedor.
+            'ruc'          => ['required', 'string', 'size:11', Rule::unique('proveedores', 'ruc')
+                ->where('user_ruc', auth()->user()->ruc)
+                ->where('estado', 1)],
             'razon_social' => 'required|string|max:200',
             'direccion'    => 'nullable|string|max:200',
             'telefono'     => 'nullable|string|max:20',

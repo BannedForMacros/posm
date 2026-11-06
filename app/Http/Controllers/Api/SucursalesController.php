@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -69,6 +70,16 @@ class SucursalesController extends Controller
             // Se asume que la tabla se llama "sucursales" y que el registro
             // más reciente para el usuario es el insertado.
             $resultado = DB::select("SELECT * FROM sucursal WHERE user_ruc = ? ORDER BY id DESC LIMIT 1", [$user->ruc]);
+
+            // Mantener sincronizada la relación nueva (empresa_id) además de
+            // la columna legada `user_ruc` que usan los stored procedures.
+            $empresaId = app(TenantContext::class)->id();
+            if ($empresaId && isset($resultado[0]->id)) {
+                DB::table('sucursal')
+                    ->where('id', $resultado[0]->id)
+                    ->update(['empresa_id' => $empresaId]);
+                $resultado = DB::select("SELECT * FROM sucursal WHERE id = ? LIMIT 1", [$resultado[0]->id]);
+            }
     
             DB::commit();
     

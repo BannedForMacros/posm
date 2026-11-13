@@ -27,7 +27,7 @@ const Articulos = () => {
   const columns = [
     {
       name: 'Código',
-      selector: row => row.codarticulo,
+      selector: row => row.codigo || row.codarticulo,
       sortable: true,
       width: '100px',
     },

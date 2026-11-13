@@ -11,6 +11,7 @@ class Articulo extends Model
     public $timestamps = false;            // No tiene created_at/updated_at
 
     protected $fillable = [
+        'codigo',
         'codfamilia',
         'codsubfamilia',
         'nombrearticulo',
@@ -42,6 +43,10 @@ class Articulo extends Model
     /**
      * Relación con el modelo Familia.
      * Cada artículo pertenece a una familia (campo 'codfamilia').
+     */
+    /**
+     * OJO: la PK de `familia` es (ruc, codfamilia). Esta relación solo cruza por codfamilia,
+     * así que para cargarla hay que filtrar también por ruc (ver ArticuloController::index).
      */
     public function familia()
     {

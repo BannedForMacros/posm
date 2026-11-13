@@ -1,174 +1,152 @@
-// src/Pages/Familias/index.jsx
+// Familias y subfamilias de la empresa activa.
 import React, { useMemo, useState } from 'react';
 import MainLayout from '@/Layouts/MainLayout';
 import DataTable from 'react-data-table-component';
 import IconButton from '@/Components/ui/IconButton';
-import EstadoIndicador from '@/Components/ui/EstadoIndicador';
-import { Plus, Eye, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, FolderTree, CornerDownRight } from 'lucide-react';
 import { useFamilias } from './hooks/useFamilias';
 import { CreateModal } from './components/CreateModal';
-import ViewEditModal from './components/ViewEditModal';
 import { customStyles } from './styles/tableStyles';
 
 const Familias = () => {
-  const {
-    familias,
-    loading,
-    isCrearModalOpen,
-    familiaEditar,
-    nuevaFamilia,
-    setIsCrearModalOpen,
-    setFamiliaEditar,
-    setNuevaFamilia,
-    crearFamilia,
-    actualizarFamilia,
-    eliminarFamilia,
-  } = useFamilias();
+  const { familias, loading, error, fetchFamilias, crearFamilia, actualizarFamilia, eliminarFamilia } = useFamilias();
+  const [busqueda, setBusqueda] = useState('');
+  const [modal, setModal] = useState({ abierto: false, editar: null, padre: null });
 
-  // Estado para el buscador en tiempo real
-  const [filterText, setFilterText] = useState('');
+  const padres = useMemo(
+    () => familias.filter((f) => f.codfamilia.length === 3)
+      .sort((a, b) => a.familia.localeCompare(b.familia, 'es', { sensitivity: 'base' })),
+    [familias]
+  );
 
-  // Filtra las familias (buscando en código, familia y subfamilia)
-  const filteredFamilies = useMemo(() => {
-    const lowerFilter = filterText.toLowerCase();
-    return familias.filter((f) =>
-      f.codfamilia.toLowerCase().includes(lowerFilter) ||
-      f.familia.toLowerCase().includes(lowerFilter) ||
-      (f.subfamilia && f.subfamilia.toLowerCase().includes(lowerFilter))
-    );
-  }, [familias, filterText]);
+  // Orden jerárquico: cada familia seguida de sus subfamilias.
+  const filas = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return [...familias]
+      .sort((a, b) => a.codfamilia.localeCompare(b.codfamilia))
+      .filter((f) => !q || [f.codfamilia, f.familia, f.subfamilia].some((v) => String(v ?? '').toLowerCase().includes(q)));
+  }, [familias, busqueda]);
 
-  // Deduplicar familias por nombre para el select del CreateModal
-  const deduplicatedFamilies = useMemo(() => {
-    const seen = new Set();
-    return familias.filter((f) => {
-      if (seen.has(f.familia)) {
-        return false;
-      } else {
-        seen.add(f.familia);
-        return true;
-      }
-    });
-  }, [familias]);
-
-  // Estado para controlar la apertura del modal combinado (ViewEditModal)
-  const [isViewEditModalOpen, setIsViewEditModalOpen] = useState(false);
+  const abrir = (cfg = {}) => setModal({ abierto: true, editar: null, padre: null, ...cfg });
+  const cerrar = () => setModal({ abierto: false, editar: null, padre: null });
 
   const columns = [
     {
       name: 'Código',
-      selector: (row) => row.codfamilia,
-      sortable: true,
+      selector: (r) => r.codfamilia,
+      width: '120px',
+      cell: (r) => <span className="font-mono text-sm tabular-nums">{r.codfamilia}</span>,
     },
     {
-      name: 'Familia',
-      selector: (row) => row.familia,
-      sortable: true,
+      name: 'Nombre',
+      grow: 3,
+      cell: (r) =>
+        r.codfamilia.length === 6 ? (
+          <span className="flex items-center gap-2 pl-4 text-gray-700">
+            <CornerDownRight className="h-4 w-4 text-gray-400" />
+            {r.subfamilia}
+          </span>
+        ) : (
+          <span className="font-semibold text-gray-900">{r.familia}</span>
+        ),
     },
     {
-      name: 'Subfamilia',
-      selector: (row) => row.subfamilia,
-      sortable: true,
-    },
-    {
-      name: 'Estado',
-      cell: (row) => <EstadoIndicador estado={row.estado} />,
-      sortable: true,
-      center: true,
+      name: 'Tipo',
+      width: '140px',
+      cell: (r) =>
+        r.codfamilia.length === 6 ? (
+          <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Subfamilia</span>
+        ) : (
+          <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700">Familia</span>
+        ),
     },
     {
       name: 'Acciones',
-      cell: (row) => (
+      width: '170px',
+      cell: (r) => (
         <div className="flex gap-2">
-          {/* Botón para abrir el modal combinado (vista/edición) */}
-          <IconButton
-            icon={Eye}
-            label="Ver"
-            variant="info"
-            size="sm"
-            onClick={() => {
-              setFamiliaEditar(row);
-              setIsViewEditModalOpen(true);
-            }}
-          />
-          {/* Botón para eliminar */}
-          <IconButton
-            icon={Trash2}
-            label="Eliminar"
-            variant="danger"
-            size="sm"
-            onClick={() => eliminarFamilia(row.codfamilia)}
-          />
+          {r.codfamilia.length === 3 && (
+            <IconButton icon={Plus} label="Agregar subfamilia" variant="success" size="sm" onClick={() => abrir({ padre: r.codfamilia })} />
+          )}
+          <IconButton icon={Edit} label="Editar" variant="warning" size="sm" onClick={() => abrir({ editar: r })} />
+          <IconButton icon={Trash2} label="Eliminar" variant="danger" size="sm" onClick={() => eliminarFamilia(r)} />
         </div>
       ),
     },
   ];
 
+  const vacio = (
+    <div className="flex flex-col items-center gap-3 py-12 text-center">
+      <FolderTree className="h-10 w-10 text-gray-300" />
+      {busqueda ? (
+        <p className="text-gray-500">Nada coincide con “{busqueda}”.</p>
+      ) : (
+        <>
+          <p className="text-gray-500">Aún no hay familias. Créalas para clasificar tus artículos.</p>
+          <IconButton icon={Plus} label="Crear la primera" variant="primary" size="md" onClick={() => abrir()} />
+        </>
+      )}
+    </div>
+  );
+
   return (
     <MainLayout>
-      <div className="container mx-auto p-6 bg-white shadow-lg rounded-lg">
-        {/* Título y botón para crear nueva familia */}
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Familias</h1>
-          <IconButton
-            icon={Plus}
-            label="Crear Familia"
-            variant="primary"
-            size="md"
-            onClick={() => {
-              setNuevaFamilia({ codfamilia: '', familia: '', subfamilia: '' });
-              setIsCrearModalOpen(true);
-            }}
-          />
+      <div className="w-full rounded-xl bg-white p-6 shadow-sm">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Familias</h1>
+            <p className="text-sm text-gray-500 tabular-nums">
+              {loading ? 'Cargando…' : `${padres.length} familia(s) · ${familias.length - padres.length} subfamilia(s)`}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                className="h-10 w-full rounded-lg border border-gray-300 pl-9 pr-3 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/40 sm:w-72"
+                placeholder="Buscar familia o subfamilia"
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+              />
+            </div>
+            <IconButton icon={Plus} label="Nueva familia" variant="primary" size="md" onClick={() => abrir()} />
+          </div>
         </div>
 
-        {/* Buscador en tiempo real con ancho 1/2 */}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Buscar familias..."
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            className="w-1/2 px-4 py-2 border rounded"
-          />
-        </div>
+        {error && (
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button type="button" className="font-semibold underline" onClick={fetchFamilias}>Reintentar</button>
+          </div>
+        )}
 
-        {/* DataTable */}
         <DataTable
           columns={columns}
-          data={filteredFamilies}
+          data={filas}
           customStyles={customStyles}
-          pagination
           progressPending={loading}
-          progressComponent={<div className="text-center p-4">Cargando familias...</div>}
-          noDataComponent={<div className="text-center p-4">No hay familias registradas.</div>}
+          progressComponent={
+            <div className="w-full space-y-2 p-4">
+              {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 animate-pulse rounded bg-gray-100" />)}
+            </div>
+          }
+          noDataComponent={vacio}
+          pagination
+          paginationPerPage={50}
+          paginationRowsPerPageOptions={[50, 100, 200]}
+          fixedHeader
+          fixedHeaderScrollHeight="65vh"
           highlightOnHover
-          pointerOnHover
         />
 
-        {/* MODAL DE CREACIÓN */}
         <CreateModal
-          isOpen={isCrearModalOpen}
-          onClose={() => {
-            setNuevaFamilia({ codfamilia: '', familia: '', subfamilia: '' });
-            setIsCrearModalOpen(false);
-          }}
-          nuevaFamilia={nuevaFamilia}
-          setNuevaFamilia={setNuevaFamilia}
-          onSubmit={() => {
-            crearFamilia(nuevaFamilia);
-            setNuevaFamilia({ codfamilia: '', familia: '', subfamilia: '' });
-          }}
-          familias={deduplicatedFamilies}
-        />
-
-        {/* MODAL COMBINADO (VISTA / EDICIÓN) */}
-        <ViewEditModal
-          isOpen={isViewEditModalOpen}
-          onClose={() => setIsViewEditModalOpen(false)}
-          familia={familiaEditar}
-          setFamilia={setFamiliaEditar}
-          onSubmit={() => actualizarFamilia(familiaEditar)}
+          isOpen={modal.abierto}
+          onClose={cerrar}
+          editar={modal.editar}
+          padre={modal.padre}
+          familias={padres}
+          onGuardar={(datos) => (modal.editar ? actualizarFamilia(modal.editar.codfamilia, datos) : crearFamilia(datos))}
         />
       </div>
     </MainLayout>

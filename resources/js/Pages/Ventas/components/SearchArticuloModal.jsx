@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '@/Components/ui/Modal';
+import { codigoVisible, coincideArticulo } from '@/Pages/ArticuloManage/utils/articulo';
 
 const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
   const [filtro, setFiltro] = useState('');
@@ -15,17 +16,14 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
     }
   }, [isOpen]);
 
-  const filtered = articulos.filter(a =>
-    a.codarticulo.toString().includes(filtro) ||
-    (a.nombrecorto || '').toLowerCase().includes(filtro.toLowerCase())
-  );
+  const filtered = (Array.isArray(articulos) ? articulos : []).filter(a => coincideArticulo(a, filtro));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Buscar Artículo">
       <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
         <input
           type="text"
-          placeholder="Buscar por codarticulo o nombre..."
+          placeholder="Buscar por código, nombre o cód. barras..."
           className="w-full border p-2 rounded"
           value={filtro}
           onChange={e => setFiltro(e.target.value)}
@@ -41,7 +39,7 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
           <tbody>
             {filtered.map(art => (
               <tr key={art.codarticulo} className="border-b">
-                <td className="px-2 py-1">{art.codarticulo}</td>
+                <td className="px-2 py-1 font-mono">{codigoVisible(art)}</td>
                 <td className="px-2 py-1">{art.nombrearticulo || art.nombrecorto}</td>
                 <td className="px-2 py-1">
                   <button

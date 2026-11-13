@@ -1,146 +1,93 @@
-import { useState, useEffect } from 'react';
+// Familias y subfamilias de la empresa activa. Los códigos los asigna el servidor.
+import { useCallback, useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
+import { erroresDeServidor } from '@/Pages/ArticuloManage/utils/articulo';
+
+export const toast = (title, icon = 'success') =>
+  Swal.fire({ toast: true, position: 'top-end', icon, title, showConfirmButton: false, timer: 2200, timerProgressBar: true });
+
+const enviar = async (url, method, body) => {
+  try {
+    const r = await fetch(url, {
+      method,
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) return { ok: true, data: data.data, message: data.message };
+    return { ok: false, errors: r.status === 422 ? erroresDeServidor(data) : {}, message: data.message || `Error ${r.status}` };
+  } catch {
+    return { ok: false, errors: {}, message: 'No se pudo conectar con el servidor.' };
+  }
+};
 
 export const useFamilias = () => {
-  const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
   const [familias, setFamilias] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
-  const [isEditarModalOpen, setIsEditarModalOpen] = useState(false);
-  const [familiaEditar, setFamiliaEditar] = useState(null);
-  const [soloVer, setSoloVer] = useState(false);
-  const [nuevaFamilia, setNuevaFamilia] = useState({
-    codfamilia: '',
-    familia: '',
-    subfamilia: '',
-  });
+  const [error, setError] = useState(null);
 
-  const fetchFamilias = async () => {
+  const fetchFamilias = useCallback(async () => {
+    setError(null);
     try {
-      const response = await fetch('/api/familias', {
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': token
-        }
-      });
-      const data = await response.json();
+      const r = await fetch('/api/familias', { headers: { Accept: 'application/json' } });
+      if (!r.ok) throw new Error('No se pudieron cargar las familias.');
+      const data = await r.json();
       setFamilias(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
-      setFamilias([]);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const crearFamilia = async (nuevaFamilia) => {
-    try {
-      const response = await fetch('/api/familias', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': token
-        },
-        body: JSON.stringify(nuevaFamilia),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al crear familia');
-      }
-
-      const data = await response.json();
-      setFamilias(prev => [...prev, data.data]);
-      setIsCrearModalOpen(false);
-      Swal.fire('¡Éxito!', 'Familia creada correctamente', 'success');
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
+  /** { tipo: 'familia', familia } | { tipo: 'subfamilia', codfamilia_padre, subfamilia } */
+  const crearFamilia = async (datos) => {
+    const res = await enviar('/api/familias', 'POST', datos);
+    if (res.ok) {
+      await fetchFamilias();
+      toast(res.message);
     }
+    return res;
   };
 
-  const actualizarFamilia = async (familiaEditar) => {
-    try {
-      const response = await fetch(`/api/familias/${familiaEditar.codfamilia}`, {
-        method: 'PUT',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': token
-        },
-        body: JSON.stringify(familiaEditar),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al actualizar familia');
-      }
-
-      const data = await response.json();
-      setFamilias(prev =>
-        prev.map(f => f.codfamilia === familiaEditar.codfamilia ? data.data : f)
-      );
-      setIsEditarModalOpen(false);
-      Swal.fire('¡Éxito!', 'Familia actualizada correctamente', 'success');
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
+  /** Solo cambia el nombre (familia o subfamilia según el código). */
+  const actualizarFamilia = async (codfamilia, datos) => {
+    const res = await enviar(`/api/familias/${encodeURIComponent(codfamilia)}`, 'PUT', datos);
+    if (res.ok) {
+      await fetchFamilias(); // renombrar una familia también cambia sus subfamilias
+      toast(res.message);
     }
+    return res;
   };
 
-  const eliminarFamilia = async (codfamilia) => {
-    try {
-      const result = await Swal.fire({
-        title: '¿Estás seguro?',
-        text: "Esta acción no se puede revertir",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-      });
+  const eliminarFamilia = async (fila) => {
+    const esSub = fila.codfamilia.length === 6;
+    const nombre = String(esSub ? fila.subfamilia : fila.familia).replace(/</g, '&lt;');
+    const { isConfirmed } = await Swal.fire({
+      title: esSub ? '¿Eliminar subfamilia?' : '¿Eliminar familia?',
+      html: `Se dará de baja <b>${nombre}</b>.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      focusCancel: true,
+    });
+    if (!isConfirmed) return;
 
-      if (result.isConfirmed) {
-        const response = await fetch(`/api/familias/${codfamilia}`, {
-          method: 'DELETE',
-          headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': token
-          },
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Error al eliminar familia');
-        }
-
-        setFamilias(prev => prev.filter(f => f.codfamilia !== codfamilia));
-        Swal.fire('¡Eliminado!', 'La familia ha sido eliminada', 'success');
-      }
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
+    const res = await enviar(`/api/familias/${encodeURIComponent(fila.codfamilia)}`, 'DELETE');
+    if (res.ok) {
+      setFamilias((prev) => prev.filter((f) => f.codfamilia !== fila.codfamilia));
+      toast(res.message);
+    } else {
+      Swal.fire('No se pudo eliminar', res.message, 'warning');
     }
   };
 
   useEffect(() => {
     fetchFamilias();
-  }, []);
+  }, [fetchFamilias]);
 
-  return {
-    familias,
-    loading,
-    isCrearModalOpen,
-    isEditarModalOpen,
-    familiaEditar,
-    soloVer,
-    nuevaFamilia,
-    setIsCrearModalOpen,
-    setIsEditarModalOpen,
-    setFamiliaEditar,
-    setSoloVer,
-    setNuevaFamilia,
-    crearFamilia,
-    actualizarFamilia,
-    eliminarFamilia,
-  };
+  return { familias, loading, error, fetchFamilias, crearFamilia, actualizarFamilia, eliminarFamilia };
 };

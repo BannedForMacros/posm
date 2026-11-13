@@ -87,10 +87,17 @@ mientras que el POS de escritorio sigue sobre la base **MySQL** remota (ver secc
    `auth()->user()->ruc` (accessor que devuelve el RUC de la **empresa activa**). Para operaciones
    por `id`, verificar pertenencia antes de modificar/borrar (patrón `perteneceAlUsuario($id)` en
    los controladores). No uses `users.ruc` directamente: la fuente de verdad es `TenantContext`.
-3. **`familia.codfamilia` es PK GLOBAL** (varchar(6), no compuesta con ruc). Los correlativos de
-   familia se generan globalmente, NO por ruc (si filtras por ruc al generar, colisionan entre empresas).
-   Códigos: familia = 3 dígitos ("001"), subfamilia = 6 dígitos ("001002" = familia 001 + sub 002).
-   En `articulos`, `codfamilia`/`codsubfamilia` son varchar(6): se guardan **códigos, nunca nombres**.
+3. **`familia` tiene PK POR EMPRESA `(ruc, codfamilia)`** (desde la migración `2026_11_13_000001`;
+   antes era PK global). Los códigos los genera `FamiliaController`, nunca el usuario, con correlativo
+   **por empresa**: familia = 3 dígitos ("001"), subfamilia = 6 dígitos ("001002" = familia 001 + sub 002).
+   No uses `$familia->save()` ni la relación `Articulo::familia()` sin filtrar por `ruc` (Eloquent solo
+   conoce `codfamilia` como clave y cruzaría empresas). En `articulos`, `codfamilia` (3) y
+   `codsubfamilia` (3, solo la parte de la sub) guardan **códigos, nunca nombres**.
+3b. **Artículos: `codarticulo` es el ID interno** (entero identity, PK global, lo usan las FKs y las
+   rutas `/api/articulos-manage/{codarticulo}`). **`articulos.codigo` es el código visible y libre**
+   (alfanumérico, MAYÚSCULAS, máx. 30, único por `(ruc, codigo)`); si no se envía se propone el siguiente
+   número libre de la empresa. Utilidades/validación compartidas del frontend en
+   `resources/js/Pages/ArticuloManage/utils/articulo.js`.
 4. **La tabla `ventas` tiene PK COMPUESTA**: `(COD_DOCUMENTO, SERI_VENTA, NUME_VENTA, RUCEMPRESA)`.
    No tiene columna `id`. `ventasdetalle` y `ventaformapago` NO tienen `ruc`; se vinculan a `ventas`
    por `(COD_DOCUMENTO, SERI_VENTA, NUME_VENTA)`. Los modelos `Venta`/`VentasDetalle` NO deben usarse

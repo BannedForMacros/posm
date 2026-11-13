@@ -22,9 +22,12 @@ class ArticuloController extends Controller
             $rucUsuario = $user->ruc;
 
             // 3) Obtener artículos con la relación familia
-            $articulos = Articulo::with('familia')
-                ->where('ruc', $rucUsuario)
-                ->get();
+            // La PK de familia es (ruc, codfamilia): se resuelve con las familias de ESTA
+            // empresa (la relación Eloquent solo conoce codfamilia y podría cruzar empresas).
+            $familias = \App\Models\Familia::where('ruc', $rucUsuario)->get()->keyBy('codfamilia');
+            $articulos = Articulo::where('ruc', $rucUsuario)
+                ->get()
+                ->each(fn ($a) => $a->setRelation('familia', $familias->get($a->codfamilia)));
 
             // Este endpoint lo consumen fetch() del frontend (Articulos.jsx,
             // Warehouse/MovementsIndex.jsx): debe devolver JSON, no una vista.

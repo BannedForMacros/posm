@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '@/Components/ui/Modal';
 import { Plus } from 'lucide-react';
 import CreateArticuloModal from './CreateArticuloModal';
+import { codigoVisible, coincideArticulo } from '@/Pages/ArticuloManage/utils/articulo';
 
 const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
   const [filtro, setFiltro] = useState('');
@@ -24,11 +25,7 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
     if (isOpen) cargarArticulos();
   }, [isOpen, cargarArticulos]);
 
-  const filtered = articulos.filter(a =>
-    a.codarticulo.toString().includes(filtro) ||
-    (a.nombrearticulo || '').toLowerCase().includes(filtro.toLowerCase()) ||
-    (a.nombrecorto || '').toLowerCase().includes(filtro.toLowerCase())
-  );
+  const filtered = articulos.filter(a => coincideArticulo(a, filtro));
 
   // Al crear un producto nuevo: refrescar la lista y seleccionarlo de una vez
   const handleProductoCreado = async (nuevo) => {
@@ -43,7 +40,7 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
-            placeholder="Buscar por código o nombre..."
+            placeholder="Buscar por código, nombre o cód. barras..."
             className="w-full border p-2 rounded"
             value={filtro}
             onChange={e => setFiltro(e.target.value)}
@@ -75,7 +72,7 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
                 onClick={() => onSelect(art)}
                 title="Seleccionar artículo"
               >
-                <td className="px-2 py-1">{art.codarticulo}</td>
+                <td className="px-2 py-1 font-mono">{codigoVisible(art)}</td>
                 <td className="px-2 py-1">{art.nombrearticulo || art.nombrecorto}</td>
               </tr>
             ))}
@@ -92,6 +89,7 @@ const SearchArticuloModal = ({ isOpen, onClose, onSelect }) => {
 
       {isCreateOpen && (
         <CreateArticuloModal
+          inicial={filtro.trim() && !/^[A-Z0-9\-_./]+$/.test(filtro.trim()) ? { nombrearticulo: filtro.trim() } : null}
           isOpen={isCreateOpen}
           onClose={() => setIsCreateOpen(false)}
           onCreated={handleProductoCreado}

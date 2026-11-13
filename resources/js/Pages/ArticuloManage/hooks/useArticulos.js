@@ -1,157 +1,60 @@
-// useArticulos.js
-import { useState, useEffect } from 'react';
+// useArticulos.js — listado y baja de artículos de la empresa activa.
+import { useCallback, useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 
 export const useArticulos = () => {
-  const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
   const [articulos, setArticulos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [isCrearModalOpen, setIsCrearModalOpen] = useState(false);
-  const [isEditarModalOpen, setIsEditarModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-
-  const [articuloEditar, setArticuloEditar] = useState(null);
-  const [articuloView, setArticuloView] = useState(null);
-
-  const [nuevoArticulo, setNuevoArticulo] = useState({
-    codarticulo: '',
-    codfamilia: '',
-    nombrearticulo: '',
-    estado: 1
-  });
-
-  // 1. Cargar artículos (datos reales desde la BD)
-  const fetchArticulos = async () => {
+  const fetchArticulos = useCallback(async () => {
+    setError(null);
     try {
-      const response = await fetch('/api/articulos-manage', {
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': token
-        }
-      });
-      if (!response.ok) throw new Error('Error al cargar artículos');
+      const response = await fetch('/api/articulos-manage', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('No se pudieron cargar los artículos.');
       const data = await response.json();
       setArticulos(Array.isArray(data) ? data : []);
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  // 2. Crear artículo: recargamos la lista en lugar de añadir localmente
-  const crearArticulo = async (articuloAEnviar) => {
-    try {
-      const response = await fetch('/api/articulos-manage', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': token
-        },
-        body: JSON.stringify(articuloAEnviar)
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Error al crear artículo');
-
-      // En lugar de setArticulos([...prev, data.data]), recargamos
-      await fetchArticulos();
-      setIsCrearModalOpen(false);
-      Swal.fire('¡Éxito!', 'Artículo creado correctamente', 'success');
-      
-      // Retornamos el artículo creado, por si deseas usarlo en el componente
-      return data.data;
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
-      return null;
-    }
-  };
-
-  // 3. Actualizar artículo: igual, recargamos lista
-  const actualizarArticulo = async (articulo) => {
-    try {
-      const response = await fetch(`/api/articulos-manage/${articulo.codarticulo}`, {
-        method: 'PUT',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': token
-        },
-        body: JSON.stringify(articulo)
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Error al actualizar artículo');
-
-      await fetchArticulos();
-      setIsEditarModalOpen(false);
-      Swal.fire('¡Éxito!', 'Artículo actualizado correctamente', 'success');
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
-    }
-  };
-
-  // 4. Eliminar artículo: igual, recargamos lista
-  const eliminarArticulo = async (codarticulo) => {
-    try {
-      const result = await Swal.fire({
-        title: '¿Estás seguro?',
-        text: "Esta acción no se puede revertir",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-      });
-
-      if (result.isConfirmed) {
-        const response = await fetch(`/api/articulos-manage/${codarticulo}`, {
-          method: 'DELETE',
-          headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': token
-          }
-        });
-
-        if (!response.ok) throw new Error('Error al eliminar artículo');
-
-        await fetchArticulos();
-        Swal.fire('¡Eliminado!', 'Artículo eliminado correctamente', 'success');
-      }
-    } catch (error) {
-      Swal.fire('Error', error.message, 'error');
-    }
-  };
-
-  // Cargar artículos al inicio
-  useEffect(() => {
-    fetchArticulos();
   }, []);
 
-  return {
-    articulos,
-    loading,
+  const eliminarArticulo = async (articulo) => {
+    const { isConfirmed } = await Swal.fire({
+      title: '¿Eliminar artículo?',
+      html: `Se dará de baja <b>${String(articulo.nombrearticulo ?? '').replace(/</g, '&lt;')}</b>.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      focusCancel: true,
+    });
+    if (!isConfirmed) return;
 
-    isCrearModalOpen,
-    isEditarModalOpen,
-    isViewModalOpen,
-
-    articuloEditar,
-    articuloView,
-    nuevoArticulo,
-
-    setIsCrearModalOpen,
-    setIsEditarModalOpen,
-    setIsViewModalOpen,
-    setArticuloEditar,
-    setArticuloView,
-    setNuevoArticulo,
-
-    crearArticulo,
-    actualizarArticulo,
-    eliminarArticulo
+    try {
+      const response = await fetch(`/api/articulos-manage/${articulo.codarticulo}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'No se pudo eliminar el artículo.');
+      setArticulos((prev) => prev.filter((a) => a.codarticulo !== articulo.codarticulo));
+      toast('Artículo eliminado');
+    } catch (err) {
+      Swal.fire('Error', err.message, 'error');
+    }
   };
+
+  useEffect(() => {
+    fetchArticulos();
+  }, [fetchArticulos]);
+
+  return { articulos, loading, error, fetchArticulos, eliminarArticulo };
 };
+
+export const toast = (title, icon = 'success') =>
+  Swal.fire({ toast: true, position: 'top-end', icon, title, showConfirmButton: false, timer: 2200, timerProgressBar: true });

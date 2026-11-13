@@ -272,6 +272,9 @@ Route::prefix('api/almacenes')->group(function() {
             ->name('api.articulos_manage.index');
         Route::post('/', [ArticuloManageController::class, 'store'])
             ->name('api.articulos_manage.store');
+        // Antes de /{codarticulo} para que no la capture como un ID.
+        Route::get('/siguiente-codigo', [ArticuloManageController::class, 'siguienteCodigo'])
+            ->name('api.articulos_manage.siguiente_codigo');
         Route::get('/{codarticulo}', [ArticuloManageController::class, 'show'])
             ->name('api.articulos_manage.show');
         Route::put('/{codarticulo}', [ArticuloManageController::class, 'update'])

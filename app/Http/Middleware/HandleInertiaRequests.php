@@ -36,6 +36,9 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+            // Token CSRF vigente: el login/logout regeneran la sesión sin recargar
+            // el HTML, así que el <meta csrf-token> se sincroniza desde aquí.
+            'csrf_token' => csrf_token(),
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,

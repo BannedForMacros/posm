@@ -98,6 +98,14 @@ mientras que el POS de escritorio sigue sobre la base **MySQL** remota (ver secc
    (alfanumérico, MAYÚSCULAS, máx. 30, único por `(ruc, codigo)`); si no se envía se propone el siguiente
    número libre de la empresa. Utilidades/validación compartidas del frontend en
    `resources/js/Pages/ArticuloManage/utils/articulo.js`.
+3c. **Crear venta** (`VentasController::store`): tipos 01 Factura / 03 Boleta / 12 Ticket
+   (`App\Support\TipoComprobante`). Series en la tabla `series_documento` (por empresa y tipo); el
+   **correlativo y la fecha los fija el servidor** (se ignoran si el cliente los envía). Correlativo =
+   máx(`NUME_VENTA`)+1 de la serie, sin ceros a la izquierda, bloqueando la fila de la serie. Clientes
+   en `clientes` (por empresa); `GET /api/clientes/buscar` busca primero ahí y luego en la API de DBPeru
+   (`CONSULTA_DOCUMENTO_URL`, sin token; `App\Services\ConsultaDocumentoService`). Totales con `App\Support\TotalesVenta` (precio con IGV incluido).
+   `articulos.codunidad` = unidad de medida (FK lógica a `unidadmedida`, por defecto 1 = NIU).
+   Tests: `tests/Concerns/CreaEsquemaNegocio.php` recrea en SQLite las tablas de negocio.
 4. **La tabla `ventas` tiene PK COMPUESTA**: `(COD_DOCUMENTO, SERI_VENTA, NUME_VENTA, RUCEMPRESA)`.
    No tiene columna `id`. `ventasdetalle` y `ventaformapago` NO tienen `ruc`; se vinculan a `ventas`
    por `(COD_DOCUMENTO, SERI_VENTA, NUME_VENTA)`. Los modelos `Venta`/`VentasDetalle` NO deben usarse

@@ -3,349 +3,433 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
-use App\Models\WarehouseDocument; 
+use App\Models\Cliente;
+use App\Models\SerieDocumento;
+use App\Models\WarehouseDocument;
 use App\Models\WarehouseDocumentDetail;
-use Carbon\Carbon;
+use App\Support\DocumentoIdentidad;
+use App\Support\TipoComprobante;
+use App\Support\TotalesVenta;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 class VentasController extends Controller
 {
-    /**
-     * Retorna las ventas asociadas al RUC del usuario autenticado
-     * usando el procedimiento almacenado.
-     * 
-     * URL: GET /api/ventas
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
+    private const CLIENTE_VARIOS = 'CLIENTES VARIOS';
+
+    /** GET /api/ventas — ventas de la empresa activa. */
     public function index(Request $request)
     {
-        $user = auth()->user();
-        if (!$user) {
-            return response()->json(['error' => 'Unauthorized'], 401);
-        }
-
-        // Obtener el RUC del usuario autenticado
-        $ruc = $user->ruc;
-
         try {
-            // Llamar al procedimiento almacenado para obtener ventas
-            $ventas = DB::select("SELECT * FROM \"ObtenerVentasPorRUC\"(?)", [$ruc]);
-            return response()->json($ventas);
+            return response()->json(DB::select('SELECT * FROM "ObtenerVentasPorRUC"(?)', [$request->user()->ruc]));
         } catch (\Exception $e) {
-            return response()->json([
-                'error'   => 'Error al obtener las ventas',
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['error' => 'Error al obtener las ventas', 'message' => $e->getMessage()], 500);
         }
     }
 
     /**
-     * Obtiene los detalles de una venta específica.
-     * 
-     * URL: GET /api/ventas/detalles/{cod_documento}/{seri_venta}/{nume_venta}
-     *
-     * @param string $cod_documento
-     * @param string $seri_venta
-     * @param int $nume_venta
-     * @return \Illuminate\Http\JsonResponse
+     * GET /api/ventas/configuracion — todo lo que necesita el formulario "Crear venta".
+     * La fecha la fija el servidor (no es editable).
      */
+    public function configuracion(Request $request): JsonResponse
+    {
+        $ruc = $request->user()->ruc;
 
+        return response()->json([
+            'fecha' => now()->format('Y-m-d'),
+            'tipos' => TipoComprobante::catalogo(),
+            'almacenes' => $this->almacenesDeEmpresa($ruc)->values(),
+            'listas_precios' => DB::table('lista_precios')->where('ruc', $ruc)->where('estado', 1)
+                ->orderBy('id')->get(['id', 'nombre']),
+            'boleta_monto_identificacion' => TipoComprobante::BOLETA_MONTO_IDENTIFICACION,
+        ]);
+    }
 
-     // Tasa de IGV (Perú). Los precios unitarios que ingresa el cajero
-     // se interpretan como precio CON IGV incluido (boleta/factura).
-     private const TASA_IGV = 18.0;
+    /**
+     * GET /api/ventas/catalogo?lista_precios_id=&almacen_id=
+     * Artículos activos con su precio por defecto (según la lista) y su stock (según el almacén).
+     */
+    public function catalogo(Request $request): JsonResponse
+    {
+        $ruc = $request->user()->ruc;
+        $request->validate([
+            'lista_precios_id' => 'nullable|integer',
+            'almacen_id' => 'nullable|integer',
+        ]);
 
-     public function store(Request $request)
-     {
-         $request->validate([
-             'cod_documento'        => 'required|string|max:2',
-             'seri_venta'           => 'required|string|max:20',
-             // Si no se envía, se autogenera el siguiente correlativo de la serie
-             'nume_venta'           => 'nullable|string|max:20',
-             'almacen_id'           => 'required|integer',
-             'fecha'                => 'required|date',
+        $listaId = $request->filled('lista_precios_id')
+            && DB::table('lista_precios')->where('id', $request->lista_precios_id)->where('ruc', $ruc)->exists()
+            ? (int) $request->lista_precios_id : null;
+        $almacenId = $request->filled('almacen_id')
+            && $this->almacenesDeEmpresa($ruc)->contains('id', (int) $request->almacen_id)
+            ? (int) $request->almacen_id : null;
 
-             // Datos del cliente (manuales en este formulario)
-             'cliente_nombre'       => 'required|string|max:150',
-             'cliente_documento'    => 'nullable|string|max:150',
+        $articulos = DB::table('articulos as a')
+            ->leftJoin('unidadmedida as u', 'u.codunidad', '=', 'a.codunidad')
+            ->where('a.ruc', $ruc)
+            ->where('a.estado', 1)
+            ->orderBy('a.nombrearticulo')
+            ->get(['a.codarticulo', 'a.codigo', 'a.nombrearticulo', 'a.codbarra', 'a.codunidad', 'u.unidad', 'u.siglasunat']);
 
-             // Detalles
-             'detalles'                         => 'required|array|min:1',
-             'detalles.*.cod_articulo'          => 'required|integer',
-             'detalles.*.cantidad'              => 'required|numeric|gt:0',
-             'detalles.*.precio_unitario'       => 'required|numeric|gte:0',
-         ]);
+        // Precio: el de la unidad del artículo en la lista; si no hay, el marcado por defecto.
+        $precios = $listaId
+            ? DB::table('preciosunidadm')->where('lista_precios_id', $listaId)
+                ->orderByDesc('pordefecto')->get(['codarticulo', 'codunidad', 'preciopublico'])
+                ->groupBy('codarticulo')
+            : collect();
 
-         // Usuario actual
-         $user = $request->user();
-         if (!$user) {
-             return response()->json(['error' => 'Usuario no autenticado'], 401);
-         }
+        $stock = $almacenId
+            ? DB::table('inventario')->where('ruc', $ruc)->where('almacen_id', $almacenId)
+                ->pluck('stock', 'cod_articulo')
+            : collect();
 
-         // Asignamos su RUC
-         $rucUsuario = $user->ruc;
-         if (!$rucUsuario) {
-             return response()->json([
-                 'error' => 'El usuario no tiene un RUC asignado; no se puede registrar la venta.'
-             ], 422);
-         }
+        return response()->json($articulos->map(function ($a) use ($precios, $stock, $almacenId) {
+            $filas = $precios->get($a->codarticulo, collect());
+            $fila = $filas->firstWhere('codunidad', $a->codunidad) ?? $filas->first();
 
-         $codDocumento = $request->cod_documento;
-         $seriVenta    = $request->seri_venta;
-         // Fecha de emisión en formato Y-m-d (el dashboard la parsea con STR_TO_DATE)
-         $femiVenta    = Carbon::parse($request->fecha)->format('Y-m-d');
+            return [
+                'codarticulo' => $a->codarticulo,
+                'codigo' => $a->codigo ?: (string) $a->codarticulo,
+                'nombre' => $a->nombrearticulo,
+                'codbarra' => $a->codbarra,
+                'codunidad' => $a->codunidad,
+                'unidad' => $a->siglasunat ?: 'NIU',
+                'unidad_nombre' => $a->unidad ?: 'unidad',
+                'precio' => $fila ? round((float) $fila->preciopublico, 2) : null,
+                'stock' => $almacenId ? (float) ($stock[$a->codarticulo] ?? 0) : null,
+            ];
+        })->values());
+    }
 
-         DB::beginTransaction();
-         try {
-             // 0) Validar stock disponible ANTES de registrar la salida:
-             //    antes se truncaba a 0 en silencio y el inventario quedaba
-             //    descuadrado respecto al documento de almacén.
-             $sinStock = [];
-             foreach ($request->detalles as $det) {
-                 $invent = DB::table('inventario')
-                     ->where('ruc', $rucUsuario)
-                     ->where('almacen_id', $request->almacen_id)
-                     ->where('cod_articulo', $det['cod_articulo'])
-                     ->first();
+    /**
+     * POST /api/ventas — registra la venta en una transacción:
+     * valida → bloquea la serie → asigna correlativo → inserta cabecera y detalle →
+     * guarda/actualiza el cliente → documento de almacén → descuenta inventario.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $ruc = $user->ruc;
+        if (! $ruc) {
+            return response()->json(['message' => 'No hay una empresa activa para registrar la venta.'], 422);
+        }
 
-                 $disponible = $invent->stock ?? 0;
-                 if ($disponible < $det['cantidad']) {
-                     $sinStock[] = [
-                         'cod_articulo' => $det['cod_articulo'],
-                         'solicitado'   => $det['cantidad'],
-                         'disponible'   => $disponible,
-                     ];
-                 }
-             }
+        [$datos, $articulos] = $this->validarVenta($request, $ruc);
 
-             if (!empty($sinStock)) {
-                 DB::rollBack();
-                 return response()->json([
-                     'error'    => 'Stock insuficiente para uno o más artículos',
-                     'detalles' => $sinStock,
-                 ], 422);
-             }
+        $cod = $datos['cod_documento'];
+        $serie = $datos['seri_venta'];
+        $totales = TotalesVenta::calcular($datos['detalles']);
+        $cliente = $this->resolverCliente($datos, $cod, $totales['total']);
 
-             // 1) Determinar el correlativo (NUME_VENTA).
-             //    Si el cajero lo escribió, se valida que no exista ya;
-             //    si lo dejó vacío, se autogenera el siguiente de la serie.
-             if ($request->filled('nume_venta')) {
-                 $numeVenta = $request->nume_venta;
-                 $yaExiste = DB::table('ventas')
-                     ->where('RUCEMPRESA', $rucUsuario)
-                     ->where('COD_DOCUMENTO', $codDocumento)
-                     ->where('SERI_VENTA', $seriVenta)
-                     ->where('NUME_VENTA', $numeVenta)
-                     ->exists();
-                 if ($yaExiste) {
-                     DB::rollBack();
-                     return response()->json([
-                         'error' => "Ya existe una venta {$codDocumento}-{$seriVenta}-{$numeVenta}."
-                     ], 422);
-                 }
-             } else {
-                 $ultimo = DB::table('ventas')
-                     ->where('RUCEMPRESA', $rucUsuario)
-                     ->where('COD_DOCUMENTO', $codDocumento)
-                     ->where('SERI_VENTA', $seriVenta)
-                     ->max(DB::raw('CAST("NUME_VENTA" AS INTEGER)'));
-                 $numeVenta = str_pad(((int) $ultimo) + 1, 8, '0', STR_PAD_LEFT);
-             }
+        $resultado = DB::transaction(function () use ($datos, $ruc, $user, $cod, $serie, $totales, $cliente, $articulos) {
+            // Bloquear la serie serializa las ventas concurrentes de la misma serie:
+            // dos cajeros no pueden obtener el mismo correlativo.
+            SerieDocumento::activas($ruc, $cod)->where('serie', $serie)->lockForUpdate()->firstOrFail();
+            $numero = (string) SerieDocumento::siguienteCorrelativo($ruc, $cod, $serie);
 
-             // 2) Calcular totales de la venta (IGV incluido en el precio unitario)
-             $factor      = 1 + (self::TASA_IGV / 100);
-             $totalVenta  = 0.0;  // total con IGV
-             $netoVenta   = 0.0;  // valor de venta sin IGV
-             $igvVenta    = 0.0;  // IGV total
-             $lineas      = [];
+            $this->validarStock($ruc, $datos['almacen_id'], $datos['detalles'], $articulos);
 
-             foreach ($request->detalles as $i => $det) {
-                 $cantidad   = (float) $det['cantidad'];
-                 $precioUnit = (float) $det['precio_unitario']; // con IGV
-                 $totalLinea = round($cantidad * $precioUnit, 2);
-                 $netoUnit   = round($precioUnit / $factor, 4);   // neto unitario
-                 $netoLinea  = round($netoUnit * $cantidad, 4);
-                 $igvLinea   = round($totalLinea - $netoLinea, 4);
+            $idCliente = null;
+            if ($cliente['numero_documento'] !== '') {
+                $idCliente = Cliente::updateOrCreate(
+                    ['ruc_empresa' => $ruc, 'numero_documento' => $cliente['numero_documento']],
+                    [
+                        'tipo_documento' => $cliente['tipo_documento'],
+                        'razon_social' => $cliente['razon_social'],
+                        'direccion' => $cliente['direccion'],
+                        'fuente' => $cliente['fuente'],
+                    ]
+                )->id;
+            }
 
-                 $totalVenta += $totalLinea;
-                 $netoVenta  += $netoLinea;
-                 $igvVenta   += $igvLinea;
+            $ahora = now();
+            DB::table('ventas')->insert([
+                'COD_DOCUMENTO' => $cod,
+                'SERI_VENTA' => $serie,
+                'NUME_VENTA' => $numero,
+                'RUCEMPRESA' => $ruc,
+                'ID_CLIENTE' => $idCliente,
+                'FEMI_VENTA' => $ahora->format('Y-m-d'),
+                'HORAEMISION' => $ahora->format('H:i:s'),
+                'TNETO_VENTA' => $totales['neto'],
+                'TDES_VENTA' => 0,
+                'IMPU_VENTA' => $totales['igv'],
+                'TOTAL_VENTA' => $totales['total'],
+                'TCAMB_VENTA' => 1,
+                'ESTA_VENTA' => 1,
+                'fec_crea' => $ahora,
+                'CREA_USUARIO' => $user->name,
+                'TIPODOCUMENTOCLI' => $cliente['tipo_documento'],
+                'NUMERODOCUMENTOCLI' => $cliente['numero_documento'],
+                'RAZONSOCIALCLI' => $cliente['razon_social'],
+                'DIRECCIONCLI' => $cliente['direccion'],
+                'NUMEROITEMS' => (string) count($totales['lineas']),
+                'CODALMACEN' => (string) $datos['almacen_id'],
+            ]);
 
-                 $lineas[] = [
-                     'idx'         => $i + 1,
-                     'cod'         => $det['cod_articulo'],
-                     'cantidad'    => $cantidad,
-                     'precio_unit' => $precioUnit,
-                     'neto_unit'   => $netoUnit,
-                     'igv_linea'   => $igvLinea,
-                     'total_linea' => $totalLinea,
-                 ];
-             }
+            foreach ($totales['lineas'] as $i => $linea) {
+                $art = $articulos[$datos['detalles'][$i]['cod_articulo']];
+                DB::table('ventasdetalle')->insert([
+                    'COD_DOCUMENTO' => $cod,
+                    'SERI_VENTA' => $serie,
+                    'NUME_VENTA' => $numero,
+                    'ID_VENTASD' => $linea['item'],
+                    'COD_ARTICULO' => (string) $art->codarticulo,
+                    'CODIGOARTINTERNO' => $art->codigo,
+                    'COD_UNIDADM' => (string) ($art->codunidad ?? 1),
+                    'UNIDADMEDIDA' => $art->siglasunat ?? 'NIU',
+                    'CANT_VENTASD' => $linea['cantidad'],
+                    'PUNI_VENTASD' => $linea['precio_unitario'],
+                    'IMPU_VENTASD' => $linea['igv'],
+                    'TNETO_VENTASD' => $linea['neto_unitario'],
+                    'TDESC_VENTASD' => 0,
+                    'TIMP_VENTASD' => $linea['total'],
+                    'ESTA_VENTASD' => '1',
+                    'TIP_IGV' => 1,
+                    'TASA_IMP' => TotalesVenta::TASA_IGV,
+                    'FEC_CREA' => $ahora,
+                    'CREA_USUARIO' => $user->name,
+                ]);
+            }
 
-             // 3) Inferir el tipo de documento del cliente por longitud
-             $docCli = trim((string) $request->cliente_documento);
-             $tipoDocCli = strlen($docCli) === 11 ? 'RUC'
-                         : (strlen($docCli) === 8 ? 'DNI' : '');
+            // Documento de almacén (salida). venta_id queda NULL: `ventas` no tiene PK simple.
+            $doc = new WarehouseDocument();
+            $doc->ruc = $ruc;
+            $doc->almacen_id = $datos['almacen_id'];
+            $doc->facturacion_id = null;
+            $doc->venta_id = null;
+            $doc->user_id = $user->id;
+            $doc->operacion_id = 2; // Venta
+            $doc->tipo_movimiento = 'SALIDA';
+            $doc->fecha = $ahora;
+            $doc->estado = 1;
+            $doc->created_at = $ahora;
+            $doc->updated_at = $ahora;
+            $doc->save();
 
-             // 4) Insertar la cabecera en `ventas`
-             DB::table('ventas')->insert([
-                 'COD_DOCUMENTO'      => $codDocumento,
-                 'SERI_VENTA'         => $seriVenta,
-                 'NUME_VENTA'         => $numeVenta,
-                 'RUCEMPRESA'         => $rucUsuario,
-                 'FEMI_VENTA'         => $femiVenta,
-                 'TNETO_VENTA'        => round($netoVenta, 2),
-                 'TDES_VENTA'         => 0,
-                 'IMPU_VENTA'         => round($igvVenta, 2),
-                 'TOTAL_VENTA'        => round($totalVenta, 2),
-                 'TCAMB_VENTA'        => 1,
-                 'ESTA_VENTA'         => 1,
-                 'fec_crea'           => now(),
-                 'CREA_USUARIO'       => $user->name,
-                 'TIPODOCUMENTOCLI'   => $tipoDocCli,
-                 'NUMERODOCUMENTOCLI' => $docCli,
-                 'RAZONSOCIALCLI'     => $request->cliente_nombre,
-                 'CODALMACEN'         => (string) $request->almacen_id,
-             ]);
+            foreach ($datos['detalles'] as $det) {
+                WarehouseDocumentDetail::create([
+                    'warehouse_document_id' => $doc->id,
+                    'cod_articulo' => $det['cod_articulo'],
+                    'cantidad' => $det['cantidad'],
+                    'precio_unitario' => $det['precio_unitario'],
+                    'costo' => 0,
+                    'estado' => 1,
+                    'created_at' => $ahora,
+                    'updated_at' => $ahora,
+                ]);
 
-             // 5) Insertar los detalles en `ventasdetalle`
-             foreach ($lineas as $linea) {
-                 DB::table('ventasdetalle')->insert([
-                     'COD_DOCUMENTO'  => $codDocumento,
-                     'SERI_VENTA'     => $seriVenta,
-                     'NUME_VENTA'     => $numeVenta,
-                     'ID_VENTASD'     => $linea['idx'],
-                     'COD_ARTICULO'   => $linea['cod'],
-                     'COD_UNIDADM'    => 1, // unidad por defecto
-                     'CANT_VENTASD'   => $linea['cantidad'],
-                     'PUNI_VENTASD'   => $linea['precio_unit'],
-                     'IMPU_VENTASD'   => $linea['igv_linea'],
-                     'TNETO_VENTASD'  => $linea['neto_unit'],
-                     'TDESC_VENTASD'  => 0,
-                     'TIMP_VENTASD'   => $linea['total_linea'],
-                     'ESTA_VENTASD'   => '1',
-                     'TIP_IGV'        => 1,
-                     'TASA_IMP'       => self::TASA_IGV,
-                     'FEC_CREA'       => now(),
-                     'CREA_USUARIO'   => $user->name,
-                 ]);
-             }
+                DB::table('inventario')
+                    ->where('ruc', $ruc)
+                    ->where('almacen_id', $datos['almacen_id'])
+                    ->where('cod_articulo', $det['cod_articulo'])
+                    ->update(['stock' => DB::raw('stock - '.((float) $det['cantidad'])), 'updated_at' => $ahora]);
+            }
 
-             // 6) Crear la cabecera del documento de almacén (movimiento de salida).
-             //    Se deja venta_id = NULL porque warehouse_document.venta_id
-             //    referencia a la tabla legacy ventas_backup(id), no a ventas,
-             //    y la tabla ventas no tiene una PK simple (id). El vínculo real
-             //    entre la venta y su documento de almacén queda implícito por
-             //    ruc + almacen_id + operacion_id (venta) + fecha + detalles.
-             $warehouseDoc = new WarehouseDocument();
-             $warehouseDoc->ruc             = $rucUsuario;
-             $warehouseDoc->almacen_id      = $request->almacen_id;
-             $warehouseDoc->facturacion_id  = null;
-             $warehouseDoc->venta_id        = null; // ventas no tiene PK simple `id`
-             $warehouseDoc->user_id         = $user->id;
-             $warehouseDoc->operacion_id    = 2; // 2 = Venta
-             $warehouseDoc->tipo_movimiento = 'SALIDA';
-             $warehouseDoc->fecha           = $request->fecha;
-             $warehouseDoc->estado          = 1;
-             $warehouseDoc->created_at      = now();
-             $warehouseDoc->updated_at      = now();
-             $warehouseDoc->save();
+            return ['numero' => $numero, 'warehouse_document_id' => $doc->id];
+        });
 
-             // 7) Detalles del documento de almacén + descuento de inventario
-             foreach ($request->detalles as $det) {
-                 $newDetail = new WarehouseDocumentDetail();
-                 $newDetail->warehouse_document_id = $warehouseDoc->id;
-                 $newDetail->cod_articulo         = $det['cod_articulo'];
-                 $newDetail->cantidad             = $det['cantidad'];
-                 $newDetail->precio_unitario      = $det['precio_unitario'];
-                 $newDetail->estado               = 1;
-                 $newDetail->created_at           = now();
-                 $newDetail->updated_at           = now();
-                 $newDetail->save();
+        $comprobante = "{$serie}-{$resultado['numero']}";
 
-                 // Restar stock (ya validado arriba que existe y alcanza)
-                 $invent = DB::table('inventario')
-                     ->where('ruc', $rucUsuario)
-                     ->where('almacen_id', $request->almacen_id)
-                     ->where('cod_articulo', $det['cod_articulo'])
-                     ->first();
+        return response()->json([
+            'success' => true,
+            'message' => TipoComprobante::nombre($cod)." {$comprobante} registrada correctamente",
+            'venta' => [
+                'cod_documento' => $cod,
+                'seri_venta' => $serie,
+                'nume_venta' => $resultado['numero'],
+                'total_venta' => $totales['total'],
+            ],
+            'warehouse_document_id' => $resultado['warehouse_document_id'],
+        ], 201);
+    }
 
-                 DB::table('inventario')
-                     ->where('id', $invent->id)
-                     ->update([
-                         'stock'      => $invent->stock - $det['cantidad'],
-                         'updated_at' => now()
-                     ]);
-             }
-
-             DB::commit();
-             return response()->json([
-                 'success' => true,
-                 'message' => "Venta {$codDocumento}-{$seriVenta}-{$numeVenta} registrada correctamente",
-                 'venta'   => [
-                     'cod_documento' => $codDocumento,
-                     'seri_venta'    => $seriVenta,
-                     'nume_venta'    => $numeVenta,
-                     'total_venta'   => round($totalVenta, 2),
-                 ],
-                 'warehouse_document_id' => $warehouseDoc->id
-             ], 201);
-     
-         } catch (\Exception $e) {
-             DB::rollBack();
-             return response()->json([
-                 'error'   => 'Error al registrar la venta',
-                 'message' => $e->getMessage()
-             ], 500);
-         }
-     }
-     
     public function showDetails($cod_documento, $seri_venta, $nume_venta)
     {
         try {
-            // Llamar al procedimiento almacenado para obtener detalles de la venta
-            // (incluye el ruc: la PK de ventas es compuesta y la misma serie/número
-            // puede existir en otra empresa).
-            $detalles = DB::select("SELECT * FROM \"ObtenerDetallesVenta\"(?, ?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
-            ]);
-            return response()->json($detalles);
+            // Incluye el ruc: la PK de ventas es compuesta y la misma serie/número puede existir en otra empresa.
+            return response()->json(DB::select('SELECT * FROM "ObtenerDetallesVenta"(?, ?, ?, ?)', [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc,
+            ]));
         } catch (\Exception $e) {
-            return response()->json([
-                'error'   => 'Error al obtener los detalles de la venta',
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['error' => 'Error al obtener los detalles de la venta', 'message' => $e->getMessage()], 500);
         }
     }
 
-    /**
-     * Obtiene las formas de pago de una venta específica.
-     * 
-     * URL: GET /api/ventas/formas-pago/{cod_documento}/{seri_venta}/{nume_venta}
-     *
-     * @param string $cod_documento
-     * @param string $seri_venta
-     * @param int $nume_venta
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function showPaymentMethods($cod_documento, $seri_venta, $nume_venta)
     {
         try {
-            // Llamar al procedimiento almacenado para obtener formas de pago
-            // (incluye el ruc para no mezclar ventas de otra empresa)
-            $formasPago = DB::select("SELECT * FROM \"ObtenerFormasPagoVenta\"(?, ?, ?, ?)", [
-                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc
-            ]);
-            return response()->json($formasPago);
+            return response()->json(DB::select('SELECT * FROM "ObtenerFormasPagoVenta"(?, ?, ?, ?)', [
+                $cod_documento, $seri_venta, $nume_venta, auth()->user()->ruc,
+            ]));
         } catch (\Exception $e) {
-            return response()->json([
-                'error'   => 'Error al obtener las formas de pago',
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['error' => 'Error al obtener las formas de pago', 'message' => $e->getMessage()], 500);
         }
     }
 
+    // ------------------------------------------------------------------------
+
+    /**
+     * @return array{0: array, 1: array<int, object>} datos validados y artículos indexados por codarticulo
+     */
+    private function validarVenta(Request $request, string $ruc): array
+    {
+        $request->merge([
+            'seri_venta' => TipoComprobante::normalizarSerie($request->seri_venta),
+            'cliente_documento' => DocumentoIdentidad::limpiar($request->cliente_documento),
+            'cliente_nombre' => trim(preg_replace('/\s+/u', ' ', (string) $request->cliente_nombre)),
+            'cliente_direccion' => trim(preg_replace('/\s+/u', ' ', (string) $request->cliente_direccion)),
+        ]);
+
+        $articulos = [];
+        $validator = validator($request->all(), [
+            'cod_documento' => ['required', Rule::in(TipoComprobante::codigos())],
+            'seri_venta' => [
+                'required', 'string', 'max:4',
+                Rule::exists('series_documento', 'serie')
+                    ->where('ruc', $ruc)->where('cod_documento', $request->cod_documento)->where('estado', true),
+            ],
+            'almacen_id' => 'required|integer',
+            'cliente_documento' => 'nullable|string|max:11',
+            'cliente_nombre' => 'nullable|string|max:150',
+            'cliente_direccion' => 'nullable|string|max:150',
+            'cliente_fuente' => 'nullable|in:manual,consulta,local',
+            'detalles' => 'required|array|min:1|max:200',
+            'detalles.*.cod_articulo' => 'required|integer',
+            'detalles.*.cantidad' => 'required|numeric|gt:0|max:999999',
+            'detalles.*.precio_unitario' => 'required|numeric|min:0|max:9999999',
+        ], [
+            'cod_documento.required' => 'Selecciona el tipo de comprobante.',
+            'cod_documento.in' => 'Tipo de comprobante no válido.',
+            'seri_venta.required' => 'Selecciona la serie.',
+            'seri_venta.exists' => 'La serie no está registrada para este comprobante.',
+            'almacen_id.required' => 'Selecciona el almacén de salida.',
+            'cliente_nombre.max' => 'El nombre del cliente no puede superar 150 caracteres.',
+            'cliente_direccion.max' => 'La dirección no puede superar 150 caracteres.',
+            'detalles.required' => 'Agrega al menos un artículo.',
+            'detalles.min' => 'Agrega al menos un artículo.',
+            'detalles.max' => 'Máximo 200 artículos por comprobante.',
+            'detalles.*.cod_articulo.required' => 'Selecciona el artículo.',
+            'detalles.*.cantidad.required' => 'Ingresa la cantidad.',
+            'detalles.*.cantidad.numeric' => 'La cantidad debe ser un número.',
+            'detalles.*.cantidad.gt' => 'La cantidad debe ser mayor que 0.',
+            'detalles.*.cantidad.max' => 'Cantidad demasiado grande.',
+            'detalles.*.precio_unitario.required' => 'Ingresa el precio.',
+            'detalles.*.precio_unitario.numeric' => 'El precio debe ser un número.',
+            'detalles.*.precio_unitario.min' => 'El precio no puede ser negativo.',
+            'detalles.*.precio_unitario.max' => 'Precio demasiado grande.',
+        ]);
+
+        $validator->after(function (Validator $v) use ($request, $ruc, &$articulos) {
+            if (! $v->errors()->has('almacen_id') && $request->filled('almacen_id')
+                && ! $this->almacenesDeEmpresa($ruc)->contains('id', (int) $request->almacen_id)) {
+                $v->errors()->add('almacen_id', 'El almacén no pertenece a la empresa.');
+            }
+
+            // Cliente
+            $cod = (string) $request->cod_documento;
+            $doc = (string) $request->cliente_documento;
+            if ($cod === TipoComprobante::FACTURA) {
+                if (! DocumentoIdentidad::esRucValido($doc)) {
+                    $v->errors()->add('cliente_documento', $doc === '' ? 'La factura requiere el RUC del cliente.' : 'Ingresa un RUC válido (11 dígitos).');
+                }
+            } elseif ($doc !== '' && ($error = DocumentoIdentidad::error($doc))) {
+                $v->errors()->add('cliente_documento', $error);
+            }
+            if ($doc !== '' && $request->cliente_nombre === '') {
+                $v->errors()->add('cliente_nombre', 'Ingresa el nombre o razón social del cliente.');
+            }
+
+            // Artículos: deben ser de la empresa y estar activos.
+            $codigos = collect($request->input('detalles', []))->pluck('cod_articulo')->filter(fn ($c) => is_numeric($c))->map(fn ($c) => (int) $c)->unique();
+            $articulos = DB::table('articulos as a')
+                ->leftJoin('unidadmedida as u', 'u.codunidad', '=', 'a.codunidad')
+                ->where('a.ruc', $ruc)->where('a.estado', 1)->whereIn('a.codarticulo', $codigos)
+                ->get(['a.codarticulo', 'a.codigo', 'a.nombrearticulo', 'a.codunidad', 'u.siglasunat'])
+                ->keyBy('codarticulo')->all();
+            foreach ($request->input('detalles', []) as $i => $det) {
+                if (is_numeric($det['cod_articulo'] ?? null) && ! isset($articulos[(int) $det['cod_articulo']])) {
+                    $v->errors()->add("detalles.{$i}.cod_articulo", 'El artículo no existe o está inactivo.');
+                }
+            }
+        });
+
+        $datos = $validator->validate();
+        $datos['almacen_id'] = (int) $datos['almacen_id'];
+        $datos['detalles'] = array_values(array_map(fn ($d) => [
+            'cod_articulo' => (int) $d['cod_articulo'],
+            'cantidad' => (float) $d['cantidad'],
+            'precio_unitario' => round((float) $d['precio_unitario'], 4),
+        ], $datos['detalles']));
+
+        return [$datos, $articulos];
+    }
+
+    /** Datos del cliente a grabar; boleta sin documento = "CLIENTES VARIOS" (hasta el monto SUNAT). */
+    private function resolverCliente(array $datos, string $cod, float $total): array
+    {
+        $doc = (string) ($datos['cliente_documento'] ?? '');
+
+        if ($doc === '' && $cod === TipoComprobante::BOLETA && $total >= TipoComprobante::BOLETA_MONTO_IDENTIFICACION) {
+            throw ValidationException::withMessages([
+                'cliente_documento' => 'Las boletas desde S/ '.number_format(TipoComprobante::BOLETA_MONTO_IDENTIFICACION, 2).' requieren el DNI o RUC del cliente.',
+            ]);
+        }
+
+        if ($doc === '') {
+            return [
+                'tipo_documento' => '',
+                'numero_documento' => '',
+                'razon_social' => $datos['cliente_nombre'] !== '' ? $datos['cliente_nombre'] : self::CLIENTE_VARIOS,
+                'direccion' => null,
+                'fuente' => 'manual',
+            ];
+        }
+
+        return [
+            'tipo_documento' => DocumentoIdentidad::tipo($doc),
+            'numero_documento' => $doc,
+            'razon_social' => mb_strtoupper($datos['cliente_nombre']),
+            'direccion' => ($datos['cliente_direccion'] ?? '') !== '' ? $datos['cliente_direccion'] : null,
+            'fuente' => ($datos['cliente_fuente'] ?? null) === 'consulta' ? 'consulta' : 'manual',
+        ];
+    }
+
+    /** Stock suficiente sumando las líneas repetidas del mismo artículo. */
+    private function validarStock(string $ruc, int $almacenId, array $detalles, array $articulos): void
+    {
+        $pedido = collect($detalles)->groupBy('cod_articulo')->map(fn ($l) => $l->sum('cantidad'));
+        $stock = DB::table('inventario')->where('ruc', $ruc)->where('almacen_id', $almacenId)
+            ->whereIn('cod_articulo', $pedido->keys())->lockForUpdate()->pluck('stock', 'cod_articulo');
+
+        $faltantes = $pedido->filter(fn ($cant, $cod) => (float) ($stock[$cod] ?? 0) < $cant)
+            ->map(fn ($cant, $cod) => sprintf(
+                '%s: pides %s, hay %s',
+                $articulos[$cod]->nombrearticulo ?? "Artículo {$cod}",
+                rtrim(rtrim(number_format($cant, 4, '.', ''), '0'), '.'),
+                rtrim(rtrim(number_format((float) ($stock[$cod] ?? 0), 4, '.', ''), '0'), '.')
+            ));
+
+        if ($faltantes->isNotEmpty()) {
+            throw ValidationException::withMessages(['detalles' => 'Stock insuficiente — '.$faltantes->implode('; ')]);
+        }
+    }
+
+    /** Almacenes activos de la empresa (vía sucursal_almacen → sucursal). */
+    private function almacenesDeEmpresa(?string $ruc): Collection
+    {
+        return DB::table('almacen as a')
+            ->join('sucursal_almacen as sa', 'sa.almacen_id', '=', 'a.id')
+            ->join('sucursal as s', 's.id', '=', 'sa.sucursal_id')
+            ->where('s.user_ruc', $ruc)
+            ->where('a.estado', 1)->where('sa.estado', 1)->where('s.estado', 1)
+            ->orderBy('a.nombre')
+            ->distinct()
+            ->get(['a.id', 'a.nombre']);
+    }
 }

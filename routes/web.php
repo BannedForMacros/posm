@@ -377,6 +377,12 @@ Route::prefix('api/ventas')->group(function () {
     Route::post('/series', [SerieDocumentoController::class, 'store'])
          ->name('api.ventas.series.store');
 
+    // Datos para el formulario "Crear venta"
+    Route::get('/configuracion', [VentasController::class, 'configuracion'])
+         ->name('api.ventas.configuracion');
+    Route::get('/catalogo', [VentasController::class, 'catalogo'])
+         ->name('api.ventas.catalogo');
+
     // Rutas para detalles y formas de pago (si las mantienes):
     Route::get('/detalles/{cod_documento}/{seri_venta}/{nume_venta}',
         [VentasController::class, 'showDetails']

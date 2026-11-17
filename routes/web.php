@@ -8,6 +8,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\Api\ArticuloController;
 use App\Http\Controllers\Api\VentasController;
 use App\Http\Controllers\Api\SerieDocumentoController;
+use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\FamiliaController;
 use App\Http\Controllers\Api\ArticuloManageController;
 use App\Http\Controllers\Api\FacturacionController; 
@@ -387,6 +388,11 @@ Route::prefix('api/ventas')->group(function () {
 
     // Las gráficas y estadísticas viven en DashboardController (api/dashboard/graficos).
 });
+
+// Clientes: busca en la empresa y, si no existe, consulta SUNAT/RENIEC (API DBPeru).
+Route::get('/api/clientes/buscar', [ClienteController::class, 'buscar'])
+     ->middleware('throttle:30,1')
+     ->name('api.clientes.buscar');
 
 // Unidades de medida (catálogo global)
 Route::get('/api/unidades-medida', fn () => \Illuminate\Support\Facades\DB::table('unidadmedida')

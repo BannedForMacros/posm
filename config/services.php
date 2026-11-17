@@ -28,6 +28,12 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // Consulta de RUC / DNI para autocompletar clientes en ventas (API DBPeru, sin token).
+    'consulta_documento' => [
+        'url' => env('CONSULTA_DOCUMENTO_URL', 'http://java.dbperu.com:8080/ApiRuc/Consulta/ConsultaRuc'),
+        'timeout' => (int) env('CONSULTA_DOCUMENTO_TIMEOUT', 10),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

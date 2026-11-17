@@ -7,6 +7,7 @@ use Inertia\Inertia;
 // Controladores
 use App\Http\Controllers\Api\ArticuloController;
 use App\Http\Controllers\Api\VentasController;
+use App\Http\Controllers\Api\SerieDocumentoController;
 use App\Http\Controllers\Api\FamiliaController;
 use App\Http\Controllers\Api\ArticuloManageController;
 use App\Http\Controllers\Api\FacturacionController; 
@@ -368,6 +369,12 @@ Route::prefix('api/ventas')->group(function () {
     // Crear nueva venta (POST /api/ventas)
     Route::post('/', [VentasController::class, 'store'])
          ->name('api.ventas.store');
+
+    // Series de comprobante (desplegable + siguiente correlativo)
+    Route::get('/series', [SerieDocumentoController::class, 'index'])
+         ->name('api.ventas.series.index');
+    Route::post('/series', [SerieDocumentoController::class, 'store'])
+         ->name('api.ventas.series.store');
 
     // Rutas para detalles y formas de pago (si las mantienes):
     Route::get('/detalles/{cod_documento}/{seri_venta}/{nume_venta}',

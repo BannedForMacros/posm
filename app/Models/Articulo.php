@@ -12,6 +12,7 @@ class Articulo extends Model
 
     protected $fillable = [
         'codigo',
+        'codunidad',
         'codfamilia',
         'codsubfamilia',
         'nombrearticulo',

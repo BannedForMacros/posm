@@ -9,12 +9,14 @@ import { useArticulos, toast } from './hooks/useArticulos';
 import ArticuloModal from './components/ArticuloModal';
 import { ViewModal } from './components/ViewModal';
 import { customStyles } from './styles/tableStyles';
-import { codigoVisible, coincideArticulo, nombresFamilia, useFamiliasCatalogo } from './utils/articulo';
+import { codigoVisible, coincideArticulo, nombresFamilia, useFamiliasCatalogo, useUnidadesMedida } from './utils/articulo';
 
 const ArticulosManage = () => {
   const { articulos, loading, error, fetchArticulos, eliminarArticulo } = useArticulos();
   const { familias, cargando: cargandoFamilias, recargar: recargarFamilias } = useFamiliasCatalogo();
 
+  const unidades = useUnidadesMedida();
+  const siglaUnidad = (row) => unidades.find((u) => Number(u.codunidad) === Number(row.codunidad ?? 1))?.siglasunat ?? '';
   const [busqueda, setBusqueda] = useState('');
   const [formulario, setFormulario] = useState({ abierto: false, articulo: null });
   const [detalle, setDetalle] = useState(null);
@@ -44,6 +46,7 @@ const ArticulosManage = () => {
       cell: (row) => <span className="font-mono text-sm">{codigoVisible(row)}</span>,
     },
     { name: 'Nombre', selector: (row) => row.nombrearticulo, sortable: true, grow: 3, wrap: true },
+    { name: 'Unidad', selector: (row) => siglaUnidad(row), sortable: true, width: '100px' },
     { name: 'Familia', selector: (row) => nombresFamilia(familias, row).familia, sortable: true, grow: 1.5 },
     { name: 'Subfamilia', selector: (row) => nombresFamilia(familias, row).subfamilia, sortable: true, grow: 1.5 },
     {
@@ -142,7 +145,7 @@ const ArticulosManage = () => {
           onGuardado={alGuardar}
         />
 
-        <ViewModal isOpen={Boolean(detalle)} onClose={() => setDetalle(null)} articulo={detalle} familias={familias} />
+        <ViewModal isOpen={Boolean(detalle)} onClose={() => setDetalle(null)} articulo={detalle} familias={familias} unidades={unidades} />
       </div>
     </MainLayout>
   );

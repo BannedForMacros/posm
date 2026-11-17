@@ -65,6 +65,7 @@ class ArticuloManageController extends Controller
             $articulo->stockminimo = $datos['stockminimo'] ?? 0;
             $articulo->stockmaximo = $datos['stockmaximo'] ?? 0;
             $articulo->tipoigv = $datos['tipoigv'] ?? 1;
+            $articulo->codunidad = $datos['codunidad'] ?? 1;
             $articulo->icbper = 0;
             $articulo->montoicbper = 0;
             $articulo->controlpeso = 0;
@@ -95,6 +96,9 @@ class ArticuloManageController extends Controller
         $articulo->fill($datos);
         if (array_key_exists('codigo', $datos) && $datos['codigo'] === null) {
             $articulo->codigo = $articulo->getOriginal('codigo'); // vacío = conservar el actual
+        }
+        if (array_key_exists('codunidad', $datos) && $datos['codunidad'] === null) {
+            $articulo->codunidad = $articulo->getOriginal('codunidad') ?? 1;
         }
         if (array_key_exists('estado', $datos)) {
             $articulo->estado = $datos['estado'];
@@ -135,6 +139,7 @@ class ArticuloManageController extends Controller
             'codbarra' => is_string($request->codbarra) ? (trim($request->codbarra) ?: null) : $request->codbarra,
             'codfamilia' => $request->codfamilia ?: null,
             'codsubfamilia' => $request->codsubfamilia ?: null,
+            'codunidad' => $request->codunidad === '' ? null : $request->codunidad,
             'stockminimo' => $request->stockminimo === '' ? null : $request->stockminimo,
             'stockmaximo' => $request->stockmaximo === '' ? null : $request->stockmaximo,
         ]);
@@ -160,6 +165,7 @@ class ArticuloManageController extends Controller
             'stockminimo' => 'nullable|numeric|min:0|max:99999999',
             'stockmaximo' => 'nullable|numeric|min:0|max:99999999',
             'tipoigv' => 'nullable|integer|min:0|max:99',
+            'codunidad' => 'nullable|integer|exists:unidadmedida,codunidad',
             'estado' => 'sometimes|integer|in:0,1',
         ], [
             'codigo.regex' => 'El código solo admite letras, números y los signos - _ . / (sin espacios), y debe empezar con letra o número.',
@@ -181,6 +187,8 @@ class ArticuloManageController extends Controller
             'stockmaximo.min' => 'El stock máximo no puede ser negativo.',
             'stockminimo.max' => 'El stock mínimo es demasiado grande.',
             'stockmaximo.max' => 'El stock máximo es demasiado grande.',
+            'codunidad.exists' => 'Selecciona una unidad de medida válida.',
+            'codunidad.integer' => 'Selecciona una unidad de medida válida.',
         ]);
 
         // Reglas que dependen de varios campos.
@@ -207,7 +215,7 @@ class ArticuloManageController extends Controller
 
         return array_intersect_key($datos, array_flip([
             'codigo', 'nombrearticulo', 'nombrecorto', 'codbarra', 'codfamilia',
-            'codsubfamilia', 'stockminimo', 'stockmaximo', 'tipoigv', 'estado',
+            'codsubfamilia', 'stockminimo', 'stockmaximo', 'tipoigv', 'codunidad', 'estado',
         ]));
     }
 

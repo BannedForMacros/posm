@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import Modal from '@/Components/ui/Modal';
 import ArticuloForm, { PieFormulario } from './ArticuloForm';
-import { guardarArticulo, obtenerCodigoSugerido, validarArticulo } from '../utils/articulo';
+import { guardarArticulo, obtenerCodigoSugerido, useUnidadesMedida, validarArticulo } from '../utils/articulo';
 
 const VACIO = {
   codigo: '',
@@ -13,6 +13,7 @@ const VACIO = {
   codsubfamilia: '',
   stockminimo: '',
   stockmaximo: '',
+  codunidad: '1', // unidad (NIU)
 };
 
 const aFormulario = (art) => ({
@@ -21,6 +22,7 @@ const aFormulario = (art) => ({
   // numeric(12,4) llega como "2.0000": se muestra limpio.
   stockminimo: art?.stockminimo != null && Number(art.stockminimo) !== 0 ? String(Number(art.stockminimo)) : '',
   stockmaximo: art?.stockmaximo != null && Number(art.stockmaximo) !== 0 ? String(Number(art.stockmaximo)) : '',
+  codunidad: String(art?.codunidad ?? 1),
   estado: art?.estado ?? 1,
 });
 
@@ -36,6 +38,7 @@ const ArticuloModal = ({ isOpen, onClose, articulo = null, inicial = null, famil
   const [guardando, setGuardando] = useState(false);
   const [sugerido, setSugerido] = useState('');
   const [errorGeneral, setErrorGeneral] = useState('');
+  const unidades = useUnidadesMedida(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,6 +91,7 @@ const ArticuloModal = ({ isOpen, onClose, articulo = null, inicial = null, famil
           onCambio={onCambio}
           errores={errores}
           familias={familias}
+          unidades={unidades}
           cargandoFamilias={cargandoFamilias}
           codigoSugerido={sugerido}
           modo={editando ? 'editar' : 'crear'}

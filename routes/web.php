@@ -381,6 +381,11 @@ Route::prefix('api/ventas')->group(function () {
     // Las gráficas y estadísticas viven en DashboardController (api/dashboard/graficos).
 });
 
+// Unidades de medida (catálogo global)
+Route::get('/api/unidades-medida', fn () => \Illuminate\Support\Facades\DB::table('unidadmedida')
+    ->orderBy('codunidad')->get(['codunidad', 'unidad', 'siglasunat']))
+     ->name('api.unidades_medida.index');
+
      /**
      * PROVEEDORES
      */

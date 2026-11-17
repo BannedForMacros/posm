@@ -150,6 +150,7 @@ export const guardarArticulo = async (articulo, { id } = {}) => {
     codbarra: String(articulo.codbarra ?? '').trim() || null,
     codfamilia: articulo.codfamilia || null,
     codsubfamilia: articulo.codsubfamilia || null,
+    codunidad: articulo.codunidad ? Number(articulo.codunidad) : null,
     stockminimo: articulo.stockminimo === '' || articulo.stockminimo == null ? null : Number(articulo.stockminimo),
     stockmaximo: articulo.stockmaximo === '' || articulo.stockmaximo == null ? null : Number(articulo.stockmaximo),
   };
@@ -168,4 +169,28 @@ export const guardarArticulo = async (articulo, { id } = {}) => {
   } catch {
     return { ok: false, errors: {}, message: 'No se pudo conectar con el servidor.' };
   }
+};
+
+/** Unidades de medida (catálogo global). Se cachea: casi nunca cambia. */
+let unidadesCache = null;
+export const useUnidadesMedida = (activo = true) => {
+  const [unidades, setUnidades] = useState(unidadesCache ?? []);
+  useEffect(() => {
+    if (!activo || unidadesCache) return;
+    fetch('/api/unidades-medida', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        unidadesCache = Array.isArray(data) ? data : [];
+        setUnidades(unidadesCache);
+      })
+      .catch(() => setUnidades([]));
+  }, [activo]);
+  return unidades;
+};
+
+/** "Kilogramo (KGM)" */
+export const etiquetaUnidad = (u) => {
+  if (!u) return '';
+  const nombre = String(u.unidad ?? '');
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} (${u.siglasunat})`;
 };

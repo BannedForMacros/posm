@@ -1,6 +1,6 @@
 // Formulario único de artículo: lo usan Crear/Editar artículo y "Nuevo producto" en Compras.
 import React from 'react';
-import { MAX_CODIGO, limpiarCantidad, limpiarCodBarra, limpiarCodigo } from '../utils/articulo';
+import { MAX_CODIGO, etiquetaUnidad, limpiarCantidad, limpiarCodBarra, limpiarCodigo } from '../utils/articulo';
 
 const inputBase =
   'mt-1 block w-full h-10 rounded-lg border px-3 text-gray-900 placeholder:text-gray-400 ' +
@@ -38,6 +38,7 @@ const ArticuloForm = ({
   onCambio,
   errores = {},
   familias = [],
+  unidades = [],
   cargandoFamilias = false,
   codigoSugerido = '',
   modo = 'crear',
@@ -96,8 +97,22 @@ const ArticuloForm = ({
         </Campo>
       </div>
 
-      <div className="sm:col-span-2">
-        <Campo label="Nombre corto" error={errores.nombrecorto} ayuda="Opcional · Para tickets (máx. 50). Si lo dejas vacío se usa el nombre.">
+      <Campo label="Unidad de medida" requerido error={errores.codunidad}>
+        <select
+          className={clase(errores.codunidad, 'bg-white')}
+          value={valores.codunidad ?? ''}
+          disabled={unidades.length === 0}
+          onChange={(e) => onCambio('codunidad', e.target.value)}
+        >
+          {unidades.length === 0 && <option value="">Cargando…</option>}
+          {unidades.map((u) => (
+            <option key={u.codunidad} value={u.codunidad}>{etiquetaUnidad(u)}</option>
+          ))}
+        </select>
+      </Campo>
+
+      <div>
+        <Campo label="Nombre corto" error={errores.nombrecorto} ayuda="Opcional · Para tickets (máx. 50)">
           <input
             type="text"
             className={clase(errores.nombrecorto)}
